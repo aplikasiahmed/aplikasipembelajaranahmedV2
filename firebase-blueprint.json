@@ -1,0 +1,185 @@
+{
+  "entities": {
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Guru / Pengajar yang mengelola sistem",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "fullname": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["Super Admin", "Admin"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "username", "fullname", "role", "created_at"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Data siswa kelas 7, 8, atau 9",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nis": { "type": "string" },
+        "namalengkap": { "type": "string" },
+        "jeniskelamin": { "type": "string" },
+        "kelas": { "type": "string" }
+      },
+      "required": ["nis", "namalengkap", "jeniskelamin", "kelas"]
+    },
+    "GradeRecord": {
+      "title": "GradeRecord",
+      "description": "Catatan nilai siswa untuk harian, UTS, UAS, atau praktik",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "student_id": { "type": "string" },
+        "subject_type": { "type": "string", "enum": ["harian", "uts", "uas", "praktik"] },
+        "score": { "type": "number" },
+        "description": { "type": "string" },
+        "kelas": { "type": "string" },
+        "semester": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "student_id", "subject_type", "score", "kelas", "semester", "created_at"]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "Catatan absensi harian",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "student_id": { "type": "string" },
+        "nis": { "type": "string" },
+        "nama_siswa": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["hadir", "sakit", "izin", "alfa"] },
+        "kelas": { "type": "string" },
+        "semester": { "type": "string" }
+      },
+      "required": ["id", "student_id", "nis", "nama_siswa", "date", "status", "kelas", "semester"]
+    },
+    "TaskSubmission": {
+      "title": "TaskSubmission",
+      "description": "Unggah tugas atau pengerjaan soal siswa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nisn": { "type": "string" },
+        "student_name": { "type": "string" },
+        "kelas": { "type": "string" },
+        "task_name": { "type": "string" },
+        "submission_type": { "type": "string", "enum": ["link", "photo"] },
+        "content": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "nisn", "student_name", "kelas", "task_name", "submission_type", "content", "created_at"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Materi pembelajaran PAI",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "grade": { "type": "string" },
+        "category": { "type": "string", "enum": ["Aqidah", "Fiqih", "Sejarah", "Akhlak", "Al-Quran"] },
+        "content_url": { "type": "string" },
+        "thumbnail": { "type": "string" }
+      },
+      "required": ["id", "title", "description", "grade", "category", "content_url"]
+    },
+    "Exam": {
+      "title": "Exam",
+      "description": "Ujian yang dirancang oleh guru",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "grade": { "type": "string" },
+        "category": { "type": "string", "enum": ["harian", "uts", "uas", "praktik"] },
+        "semester": { "type": "string" },
+        "duration": { "type": "number" },
+        "deadline": { "type": "string" },
+        "is_random": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["draft", "active", "closed"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "grade", "category", "semester", "duration", "status", "created_at"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Pertanyaan dalam ujian",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "exam_id": { "type": "string" },
+        "type": { "type": "string", "enum": ["pg", "essay"] },
+        "text": { "type": "string" },
+        "image_url": { "type": "string" },
+        "options": { "type": "array" },
+        "correct_answer": { "type": "string" }
+      },
+      "required": ["id", "exam_id", "type", "text", "correct_answer"]
+    },
+    "ExamResult": {
+      "title": "ExamResult",
+      "description": "Hasil pengerjaan ujian siswa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "exam_id": { "type": "string" },
+        "student_nis": { "type": "string" },
+        "student_name": { "type": "string" },
+        "student_class": { "type": "string" },
+        "semester": { "type": "string" },
+        "answers": { "type": "object" },
+        "score": { "type": "number" },
+        "violation_count": { "type": "number" },
+        "started_at": { "type": "string" },
+        "submitted_at": { "type": "string" }
+      },
+      "required": ["id", "exam_id", "student_nis", "student_name", "student_class", "semester", "answers", "score", "submitted_at"]
+    }
+  },
+  "firestore": {
+    "/admin_users/{adminId}": {
+      "schema": "AdminUser",
+      "description": "Koleksi akun admin / guru"
+    },
+    "/data_siswa/{studentId}": {
+      "schema": "Student",
+      "description": "Koleksi data profil siswa"
+    },
+    "/Nilai/{gradeId}": {
+      "schema": "GradeRecord",
+      "description": "Koleksi rekap nilai siswa"
+    },
+    "/kehadiran/{attendanceId}": {
+      "schema": "AttendanceRecord",
+      "description": "Koleksi rekap absensi kehadiran harian siswa"
+    },
+    "/data_TugasSiswa/{taskId}": {
+      "schema": "TaskSubmission",
+      "description": "Koleksi rekap tugas yang diserahkan siswa"
+    },
+    "/materi_belajar/{materialId}": {
+      "schema": "Material",
+      "description": "Koleksi rekap materi"
+    },
+    "/ujian/{examId}": {
+      "schema": "Exam",
+      "description": "Koleksi daftar ujian"
+    },
+    "/bank_soal/{questionId}": {
+      "schema": "Question",
+      "description": "Koleksi detail list soal dari seluruh ujian"
+    },
+    "/hasil_ujian/{resultId}": {
+      "schema": "ExamResult",
+      "description": "Koleksi hasil pengerjaan ujian online siswa"
+    }
+  }
+}

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <script>
+    // Sembunyikan log debug yang mengganggu SEBELUM script lain berjalan
+    (function() {
+        const originalLog = console.log;
+        const originalDebug = console.debug;
+        const originalWarn = console.warn;
+        const originalInfo = console.info;
+
+        function shouldSuppress(args) {
+            if (!args || args.length === 0) return false;
+            const msg = args[0];
+            if (typeof msg === 'string') {
+                return msg.includes('[vite]') || 
+                       msg.includes('CONNECTED') || 
+                       msg.includes('Render Start') || 
+                       msg.includes('Render End') ||
+                       msg.includes('React Router Future Flag Warning');
+            }
+            return false;
+        }
+
+        console.log = function(...args) {
+            if (shouldSuppress(args)) return;
+            originalLog.apply(console, args);
+        };
+
+        console.debug = function(...args) {
+            if (shouldSuppress(args)) return;
+            originalDebug.apply(console, args);
+        };
+
+        console.warn = function(...args) {
+            if (shouldSuppress(args)) return;
+            originalWarn.apply(console, args);
+        };
+
+        console.info = function(...args) {
+            if (shouldSuppress(args)) return;
+            originalInfo.apply(console, args);
+        };
+    })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal PAI & Budi Pekerti</title>
+    
+    <!-- IKON TAB BROWSER (BUKU HIJAU) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23059669' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 19.5A2.5 2.5 0 0 1 6.5 17H20'/%3E%3Cpath d='M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z'/%3E%3C/svg%3E">
+
+    <!-- Script Tailwind untuk styling (Tampilan Bagus) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* CSS Tambahan khusus yang tidak tercover Tailwind */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .arabic-text {
+            font-family: 'Amiri', serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+          width: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #e2e8f0;
+          border-radius: 10px;
+        }
+        /* SweetAlert2 Mobile Optimization */
+        .swal2-popup {
+            font-size: 0.75rem !important;
+            padding: 1rem !important;
+            border-radius: 1.5rem !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+        @media (min-width: 768px) {
+            .swal2-popup {
+                font-size: 0.9rem !important;
+                padding: 1.5rem !important;
+            }
+        }
+        .swal2-title {
+            font-size: 1.1rem !important;
+            font-weight: 700 !important;
+        }
+        .swal2-content {
+            font-size: 0.85rem !important;
+        }
+        .swal2-confirm {
+            font-size: 0.75rem !important;
+            border-radius: 0.75rem !important;
+            padding: 0.6rem 1.5rem !important;
+        }
+
+        /* PRINT STYLING */
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+        }
+        
+        #pdf-capture-area {
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
+            width: 800px;
+            background: white;
+            color: black;
+            padding: 40px;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?deps=react@18.2.0",
+    "react-dom": "https://esm.sh/react-dom@18.2.0?deps=react@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7",
+    "react-router-dom": "https://esm.sh/react-router-dom@6.22.0?deps=react@18.2.0,react-dom@18.2.0",
+    "lucide-react": "https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0",
+    "sweetalert2": "https://esm.sh/sweetalert2@11.10.0",
+    "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "jspdf": "https://esm.sh/jspdf@2.5.1",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.2",
+    "vite": "https://esm.sh/vite@5.1.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@4.2.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
+  }
+}
+</script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+    <div id="pdf-capture-area"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+</html>
