@@ -1,19 +1,4 @@
 import { Student, AttendanceRecord, GradeRecord, Material, GradeLevel, TaskSubmission, AdminUser, Exam, Question, ExamResult } from '../types';
-import { firestore } from './firebase';
-import { 
-  collection, 
-  getDocs, 
-  getDoc, 
-  doc, 
-  setDoc, 
-  addDoc, 
-  deleteDoc, 
-  updateDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit 
-} from 'firebase/firestore';
 
 // Definisikan tipe untuk spreadsheet helper
 interface SheetConfig {
@@ -34,25 +19,29 @@ const TABS_CONFIG: SheetConfig[] = [
 ];
 
 class DatabaseService {
-  // SPREADSHEET MANAGER SETTINGS
-  async getSpreadsheetId(): Promise<string | null> {
+  // HELPER LOKAL DATASTORAGE (LOCALSTORAGE)
+  private getLocalTable<T>(name: string): T[] {
+    const key = `pai_db_${name}`;
+    const data = localStorage.getItem(key);
+    if (!data) return [];
     try {
-      const snap = await getDoc(doc(firestore, 'settings', 'config'));
-      if (snap.exists() && snap.data().spreadsheetId) {
-        return snap.data().spreadsheetId;
-      }
-    } catch (e) {
-      console.error("Gagal membaca Google Sheets ID dari Firestore: ", e);
+      return JSON.parse(data) as T[];
+    } catch (_) {
+      return [];
     }
+  }
+
+  private setLocalTable<T>(name: string, data: T[]): void {
+    const key = `pai_db_${name}`;
+    localStorage.setItem(key, JSON.stringify(data));
+  }
+
+  // SPREADSHEET ID CONFIGURATION
+  async getSpreadsheetId(): Promise<string | null> {
     return localStorage.getItem('google_spreadsheet_id') || '1G_iMlKROJmq0UPb1Angg4IphW7BxVcron8yBEla7p2c';
   }
 
   async setSpreadsheetId(id: string | null): Promise<void> {
-    try {
-      await setDoc(doc(firestore, 'settings', 'config'), { spreadsheetId: id }, { merge: true });
-    } catch (e) {
-      console.error("Gagal menyimpan Google Sheets ID ke Firestore: ", e);
-    }
     if (id) {
       localStorage.setItem('google_spreadsheet_id', id);
     } else {
@@ -60,8 +49,7 @@ class DatabaseService {
     }
   }
 
-  // --- SPREADSHEET REST INTEGRATION SERVICES ---
-  
+  // --- SPREADSHEET REST API INTEGRATIONS ---
   private async fetchSheetsAPI(spreadsheetId: string, path: string, options: RequestInit, accessToken: string) {
     const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}${path}`, {
       ...options,
@@ -80,7 +68,6 @@ class DatabaseService {
 
   // Membuat Spreadsheet baru di Google Drive milik Guru
   async createDatabaseSpreadsheet(accessToken: string): Promise<string> {
-    // 1. Buat Spreadsheet Utama dengan tab utama 'admin_users'
     const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets`, {
       method: 'POST',
       headers: {
@@ -109,7 +96,6 @@ class DatabaseService {
     const spreadsheet = await res.json();
     const spreadsheetId = spreadsheet.spreadsheetId;
     
-    // 2. Tambah 8 sheet tab lainnya
     const addSheetRequests = TABS_CONFIG.filter(cfg => cfg.name !== 'admin_users').map(cfg => ({
       addSheet: {
         properties: {
@@ -124,10 +110,9 @@ class DatabaseService {
         requests: addSheetRequests
       })
     }, accessToken);
-
-    // 3. Tulis Headers (Bila ada data atau setidaknya kolom list baris 1) ke setiap tab sheet
+    
     for (const cfg of TABS_CONFIG) {
-      await this.fetchSheetsAPI(spreadsheetId, `/values/${cfg.name}!A1:Z1?valueInputOption=USER_ENTERED`, {
+      await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z1?valueInputOption=USER_ENTERED`, {
         method: 'PUT',
         body: JSON.stringify({
           range: `${cfg.name}!A1:Z1`,
@@ -141,18 +126,64 @@ class DatabaseService {
     return spreadsheetId;
   }
 
-  // Sync lokal Firestore -> Google Sheets
+  // Menginisialisasi struktur tabel & header di Spreadsheet yang sudah ada
+  async initializeExistingSpreadsheet(spreadsheetId: string, accessToken: string): Promise<void> {
+    try {
+      const metadata = await this.fetchSheetsAPI(spreadsheetId, '?fields=sheets.properties', { method: 'GET' }, accessToken);
+      const existingSheetNames = (metadata.sheets || []).map((s: any) => s.properties.title);
+
+      const requests: any[] = [];
+      const sheetsToInitHeaders: string[] = [];
+
+      for (const cfg of TABS_CONFIG) {
+        if (!existingSheetNames.includes(cfg.name)) {
+          requests.push({
+            addSheet: {
+              properties: {
+                title: cfg.name
+              }
+            }
+          });
+        }
+        sheetsToInitHeaders.push(cfg.name);
+      }
+
+      if (requests.length > 0) {
+        await this.fetchSheetsAPI(spreadsheetId, ':batchUpdate', {
+          method: 'POST',
+          body: JSON.stringify({ requests })
+        }, accessToken);
+      }
+
+      for (const cfg of TABS_CONFIG) {
+        if (sheetsToInitHeaders.includes(cfg.name)) {
+          await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z1?valueInputOption=USER_ENTERED`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              range: `${cfg.name}!A1:Z1`,
+              majorDimension: 'ROWS',
+              values: [cfg.headers]
+            })
+          }, accessToken);
+        }
+      }
+    } catch (err: any) {
+      console.error("Gagal menginisialisasi spreadsheet yang sudah ada:", err);
+      throw new Error(`Gagal menginisialisasi spreadsheet: ${err.message || err}`);
+    }
+  }
+
+  // Sinkronisasi lokal (LocalStorage) -> Google Sheets
   async syncToGoogleSheets(accessToken: string): Promise<void> {
     const spreadsheetId = await this.getSpreadsheetId();
     if (!spreadsheetId) {
       throw new Error("Spreadsheet ID belum terkonfigurasi!");
     }
 
+    await this.initializeExistingSpreadsheet(spreadsheetId, accessToken);
+
     for (const cfg of TABS_CONFIG) {
-      // Ambil seluruh dokumen dari Firestore
-      const querySnapshot = await getDocs(collection(firestore, cfg.name));
-      const items = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      
+      const items = this.getLocalTable(cfg.name);
       const values: any[][] = [cfg.headers];
       
       items.forEach((item: any) => {
@@ -165,9 +196,7 @@ class DatabaseService {
         values.push(row);
       });
 
-      // Clear baris lama dengan menulis data baru dan sisa baris kosong
-      // Kita gunakan update range penuh
-      await this.fetchSheetsAPI(spreadsheetId, `/values/${cfg.name}!A1:Z5000?valueInputOption=USER_ENTERED`, {
+      await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z5000?valueInputOption=USER_ENTERED`, {
         method: 'PUT',
         body: JSON.stringify({
           range: `${cfg.name}!A1:Z5000`,
@@ -178,31 +207,32 @@ class DatabaseService {
     }
   }
 
-  // Sync Google Sheets -> lokal Firestore
+  // Sinkronisasi Google Sheets -> lokal (LocalStorage)
   async syncFromGoogleSheets(accessToken: string): Promise<void> {
     const spreadsheetId = await this.getSpreadsheetId();
     if (!spreadsheetId) {
       throw new Error("Spreadsheet ID belum terkonfigurasi!");
     }
 
+    await this.initializeExistingSpreadsheet(spreadsheetId, accessToken);
+
     for (const cfg of TABS_CONFIG) {
-      const res = await this.fetchSheetsAPI(spreadsheetId, `/values/${cfg.name}!A1:Z5000`, { method: 'GET' }, accessToken);
+      const res = await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z5000`, { method: 'GET' }, accessToken);
       const rows: any[][] = res.values || [];
-      if (rows.length <= 1) continue; // Hanya header atau kosong
+      if (rows.length <= 1) continue;
       
       const headers = rows[0];
       const items: any[] = [];
       
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        if (row.length === 0 || !row[0]) continue; // ID kosong dilewati
+        if (row.length === 0 || !row[0]) continue;
         
         const obj: any = {};
         headers.forEach((header, colIdx) => {
           let cellVal = row[colIdx];
           if (cellVal === undefined || cellVal === null) cellVal = '';
           
-          // Deserialisasi JSON jika berupa array/object
           if (typeof cellVal === 'string' && (cellVal.startsWith('[') || cellVal.startsWith('{'))) {
             try {
               cellVal = JSON.parse(cellVal);
@@ -214,23 +244,20 @@ class DatabaseService {
         items.push(obj);
       }
 
-      // Tulis ulang koleksi di Firestore
-      for (const item of items) {
-        if (item.id) {
-          const { id, ...data } = item;
-          await setDoc(doc(firestore, cfg.name, id), data);
-        }
-      }
+      this.setLocalTable(cfg.name, items);
     }
   }
 
   // --- ADMIN FUNCTIONS ---
   async verifyAdminLogin(username: string, password: string): Promise<AdminUser | null> {
-    const ref = collection(firestore, 'admin_users');
-    const snap = await getDocs(ref);
-    
-    // Auto-seed akun guru jika database Firestore masih kosong sempurna
-    if (snap.empty) {
+    const list = await this.getAdmins();
+    const match = list.find(a => a.username === username && a.password === password);
+    return match || null;
+  }
+
+  async getAdmins(): Promise<AdminUser[]> {
+    const table = this.getLocalTable<AdminUser>('admin_users');
+    if (table.length === 0) {
       const defaultAdmin: AdminUser = {
         id: 'default-admin-pai',
         fullname: 'Bapak Guru PAI',
@@ -239,43 +266,41 @@ class DatabaseService {
         role: 'Super Admin',
         created_at: new Date().toISOString()
       };
-      await setDoc(doc(firestore, 'admin_users', 'default-admin-pai'), defaultAdmin);
+      const seeded = [defaultAdmin];
+      this.setLocalTable('admin_users', seeded);
+      return seeded;
     }
-
-    const q = query(ref, where('username', '==', username), where('password', '==', password));
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) return null;
-    
-    const docData = querySnapshot.docs[0];
-    return { id: docData.id, ...docData.data() } as AdminUser;
-  }
-
-  async getAdmins(): Promise<AdminUser[]> {
-    const querySnapshot = await getDocs(query(collection(firestore, 'admin_users'), orderBy('created_at', 'desc')));
-    return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as AdminUser[];
+    return table.sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
 
   async addAdmin(admin: Partial<AdminUser>): Promise<void> {
-    const id = admin.id || doc(collection(firestore, 'admin_users')).id;
+    const id = admin.id || 'admin_' + Math.random().toString(36).substr(2, 9);
     const cleanAdmin = {
       ...admin,
       id,
       created_at: admin.created_at || new Date().toISOString()
-    };
-    await setDoc(doc(firestore, 'admin_users', id), cleanAdmin);
+    } as AdminUser;
+    const list = await this.getAdmins();
+    const existingIdx = list.findIndex(a => a.id === id);
+    if (existingIdx > -1) {
+      list[existingIdx] = cleanAdmin;
+    } else {
+      list.push(cleanAdmin);
+    }
+    this.setLocalTable('admin_users', list);
   }
 
   async deleteAdmin(id: string): Promise<void> {
-    await deleteDoc(doc(firestore, 'admin_users', id));
+    const list = await this.getAdmins();
+    const filtered = list.filter(a => a.id !== id);
+    this.setLocalTable('admin_users', filtered);
   }
 
   // --- STUDENT FUNCTIONS ---
   async getStudentByNIS(nis: string): Promise<Student | null> {
-    const q = query(collection(firestore, 'data_siswa'), where('nis', '==', nis));
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) return null;
-    const d = querySnapshot.docs[0];
-    return { id: d.id, ...d.data() } as Student;
+    const list = this.getLocalTable<Student>('data_siswa');
+    const match = list.find(s => s.nis === nis);
+    return match || null;
   }
 
   async getStudentByNISN(nis: string): Promise<Student | null> {
@@ -283,86 +308,76 @@ class DatabaseService {
   }
 
   async getStudentsByKelas(kelas: string): Promise<Student[]> {
-    const q = query(collection(firestore, 'data_siswa'), where('kelas', '==', kelas));
-    const querySnapshot = await getDocs(q);
-    const students = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Student[];
-    return students.sort((a, b) => a.namalengkap.localeCompare(b.namalengkap));
+    const list = this.getLocalTable<Student>('data_siswa');
+    const filtered = list.filter(s => s.kelas === kelas);
+    return filtered.sort((a, b) => a.namalengkap.localeCompare(b.namalengkap));
   }
 
   async getStudentsByGrade(grade: string): Promise<Student[]> {
-    const ref = collection(firestore, 'data_siswa');
-    // Implementasi LIKE 'grade.%' versi firestore
-    const q = query(
-      ref, 
-      where('kelas', '>=', `${grade}.`), 
-      where('kelas', '<=', `${grade}.\uf8ff`)
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Student[];
+    const list = this.getLocalTable<Student>('data_siswa');
+    return list.filter(s => s.kelas && s.kelas.startsWith(`${grade}.`));
   }
 
   async getAvailableKelas(grade?: string): Promise<string[]> {
-    const ref = collection(firestore, 'data_siswa');
-    let q;
+    const list = this.getLocalTable<Student>('data_siswa');
+    let filtered = list;
     if (grade) {
-      q = query(ref, where('kelas', '>=', `${grade}.`), where('kelas', '<=', `${grade}.\uf8ff`));
-    } else {
-      q = query(ref);
+      filtered = list.filter(s => s.kelas && s.kelas.startsWith(`${grade}.`));
     }
-    const querySnapshot = await getDocs(q);
-    const uniqueKelas = Array.from(new Set<string>(querySnapshot.docs.map(d => d.data().kelas as string))).sort();
+    const uniqueKelas = Array.from(new Set<string>(filtered.map(s => s.kelas))).filter(Boolean).sort();
     return uniqueKelas;
   }
 
   async upsertStudents(students: Student[]): Promise<void> {
+    const list = this.getLocalTable<Student>('data_siswa');
     for (const s of students) {
-      // Unik berdasarkan nis siswa sebagai Document ID
-      const studentId = s.nis;
+      const studentId = s.id || s.nis;
       const cleanStudent = { ...s, id: studentId };
-      await setDoc(doc(firestore, 'data_siswa', studentId), cleanStudent);
+      const idx = list.findIndex(item => item.id === studentId || item.nis === s.nis);
+      if (idx > -1) {
+        list[idx] = cleanStudent;
+      } else {
+        list.push(cleanStudent);
+      }
     }
+    this.setLocalTable('data_siswa', list);
   }
 
   // --- GRADE FUNCTIONS ---
   async addGrade(grade: Partial<GradeRecord>): Promise<void> {
-    const id = doc(collection(firestore, 'Nilai')).id;
+    const id = grade.id || 'grade_' + Math.random().toString(36).substr(2, 9);
     const cleanGrade = {
       ...grade,
       id,
       created_at: grade.created_at || new Date().toISOString()
-    };
-    await setDoc(doc(firestore, 'Nilai', id), cleanGrade);
+    } as GradeRecord;
+    const list = this.getLocalTable<GradeRecord>('Nilai');
+    list.push(cleanGrade);
+    this.setLocalTable('Nilai', list);
   }
 
   async getGradesByStudent(studentId: string): Promise<GradeRecord[]> {
-    const q = query(
-      collection(firestore, 'Nilai'), 
-      where('student_id', '==', studentId),
-      orderBy('created_at', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as GradeRecord[];
+    const list = this.getLocalTable<GradeRecord>('Nilai');
+    return list.filter(g => g.student_id === studentId).sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
 
   async getGradesByKelas(kelas: string, semester?: string): Promise<any[]> {
-    const q = query(collection(firestore, 'Nilai'), where('kelas', '==', kelas));
-    const querySnapshot = await getDocs(q);
-    let grades = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    const list = this.getLocalTable<GradeRecord>('Nilai');
+    let filtered = list.filter(g => g.kelas === kelas);
 
     if (semester) {
       const s = semester.toLowerCase();
       if (s === '1' || s === 'ganjil') {
-        grades = grades.filter((g: any) => ['1', 'ganjil', 'semester 1', 'ganjil'].includes(g.semester.toLowerCase()));
+        filtered = filtered.filter((g: any) => ['1', 'ganjil', 'semester 1'].includes(g.semester.toLowerCase()));
       } else if (s === '2' || s === 'genap') {
-        grades = grades.filter((g: any) => ['2', 'genap', 'semester 2', 'genap'].includes(g.semester.toLowerCase()));
+        filtered = filtered.filter((g: any) => ['2', 'genap', 'semester 2'].includes(g.semester.toLowerCase()));
       } else {
-        grades = grades.filter((g: any) => g.semester.toLowerCase() === s);
+        filtered = filtered.filter((g: any) => g.semester.toLowerCase() === s);
       }
     }
 
-    // Ambil detail siswa
     const students = await this.getStudentsByKelas(kelas);
-    return grades.map((g: any) => ({
+    return filtered.map((g: any) => ({
       ...g,
       data_siswa: students.find(s => s.id === g.student_id) || { namalengkap: 'Siswa', nis: '-' }
     }));
@@ -370,43 +385,39 @@ class DatabaseService {
 
   // --- ATTENDANCE FUNCTIONS ---
   async addAttendance(records: Partial<AttendanceRecord>[]): Promise<void> {
+    const list = this.getLocalTable<AttendanceRecord>('kehadiran');
     for (const record of records) {
-      const id = doc(collection(firestore, 'kehadiran')).id;
+      const id = record.id || 'att_' + Math.random().toString(36).substr(2, 9);
       const cleanRecord = {
         ...record,
         id,
         created_at: new Date().toISOString()
-      };
-      await setDoc(doc(firestore, 'kehadiran', id), cleanRecord);
+      } as AttendanceRecord;
+      list.push(cleanRecord);
     }
+    this.setLocalTable('kehadiran', list);
   }
 
   async getAttendanceByStudent(studentId: string): Promise<AttendanceRecord[]> {
-    const q = query(
-      collection(firestore, 'kehadiran'),
-      where('student_id', '==', studentId),
-      orderBy('date', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as AttendanceRecord[];
+    const list = this.getLocalTable<AttendanceRecord>('kehadiran');
+    return list.filter(a => a.student_id === studentId).sort((a, b) => b.date.localeCompare(a.date));
   }
 
   async getAttendanceByKelas(kelas: string, semester?: string, month?: string, year?: string): Promise<any[]> {
-    const q = query(collection(firestore, 'kehadiran'), where('kelas', '==', kelas));
-    const querySnapshot = await getDocs(q);
-    let attendance = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    const list = this.getLocalTable<AttendanceRecord>('kehadiran');
+    let filtered = list.filter(a => a.kelas === kelas);
 
     if (semester) {
-      attendance = attendance.filter((a: any) => String(a.semester) === String(semester));
+      filtered = filtered.filter((a: any) => String(a.semester) === String(semester));
     }
 
     if (month) {
       const selectedYear = year || new Date().getFullYear().toString();
       const prefix = `${selectedYear}-${month.padStart(2, '0')}`;
-      attendance = attendance.filter((a: any) => a.date && a.date.startsWith(prefix));
+      filtered = filtered.filter((a: any) => a.date && a.date.startsWith(prefix));
     }
 
-    return attendance.sort((a: any, b: any) => a.date.localeCompare(b.date)).map((a: any) => ({
+    return filtered.sort((a: any, b: any) => a.date.localeCompare(b.date)).map((a: any) => ({
       ...a,
       data_siswa: { namalengkap: a.nama_siswa, nis: a.nis }
     }));
@@ -414,34 +425,19 @@ class DatabaseService {
 
   // --- RESET FUNCTIONS ---
   async resetAttendance(): Promise<void> {
-    const snap = await getDocs(collection(firestore, 'kehadiran'));
-    for (const d of snap.docs) {
-      await deleteDoc(doc(firestore, 'kehadiran', d.id));
-    }
+    this.setLocalTable('kehadiran', []);
   }
   async resetGrades(): Promise<void> {
-    const snap = await getDocs(collection(firestore, 'Nilai'));
-    for (const d of snap.docs) {
-      await deleteDoc(doc(firestore, 'Nilai', d.id));
-    }
+    this.setLocalTable('Nilai', []);
   }
   async resetTasks(): Promise<void> {
-    const snap = await getDocs(collection(firestore, 'data_TugasSiswa'));
-    for (const d of snap.docs) {
-      await deleteDoc(doc(firestore, 'data_TugasSiswa', d.id));
-    }
+    this.setLocalTable('data_TugasSiswa', []);
   }
   async resetStudents(): Promise<void> {
-    const snap = await getDocs(collection(firestore, 'data_siswa'));
-    for (const d of snap.docs) {
-      await deleteDoc(doc(firestore, 'data_siswa', d.id));
-    }
+    this.setLocalTable('data_siswa', []);
   }
   async resetMaterials(): Promise<void> {
-    const snap = await getDocs(collection(firestore, 'materi_belajar'));
-    for (const d of snap.docs) {
-      await deleteDoc(doc(firestore, 'materi_belajar', d.id));
-    }
+    this.setLocalTable('materi_belajar', []);
   }
   async resetAllData(): Promise<void> {
     await Promise.all([
@@ -449,153 +445,184 @@ class DatabaseService {
       this.resetGrades(),
       this.resetTasks(),
       this.resetStudents(),
-      this.resetMaterials()
+      this.resetMaterials(),
+      this.setLocalTable('ujian', []),
+      this.setLocalTable('bank_soal', []),
+      this.setLocalTable('hasil_ujian', [])
     ]);
   }
 
   // --- TASK FUNCTIONS ---
   async addTaskSubmission(submission: Partial<TaskSubmission>): Promise<void> {
-    const id = doc(collection(firestore, 'data_TugasSiswa')).id;
+    const id = submission.id || 'task_' + Math.random().toString(36).substr(2, 9);
     const cleanSub = {
       ...submission,
       id,
       created_at: submission.created_at || new Date().toISOString()
-    };
-    await setDoc(doc(firestore, 'data_TugasSiswa', id), cleanSub);
+    } as TaskSubmission;
+    const list = this.getLocalTable<TaskSubmission>('data_TugasSiswa');
+    list.push(cleanSub);
+    this.setLocalTable('data_TugasSiswa', list);
   }
 
   async getTaskSubmissions(grade?: string): Promise<TaskSubmission[]> {
-    const ref = collection(firestore, 'data_TugasSiswa');
-    let q = query(ref, orderBy('created_at', 'desc'));
-    
-    const querySnapshot = await getDocs(q);
-    let submissions = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as TaskSubmission[];
-
+    let list = this.getLocalTable<TaskSubmission>('data_TugasSiswa');
+    list = list.sort((a, b) => b.created_at.localeCompare(a.created_at));
     if (grade) {
-      submissions = submissions.filter(s => s.kelas && s.kelas.startsWith(`${grade}.`));
+      list = list.filter(s => s.kelas && s.kelas.startsWith(`${grade}.`));
     }
-    return submissions;
+    return list;
   }
 
   async deleteTaskSubmission(id: string): Promise<void> {
-    await deleteDoc(doc(firestore, 'data_TugasSiswa', id));
+    const list = this.getLocalTable<TaskSubmission>('data_TugasSiswa');
+    const filtered = list.filter(s => s.id !== id);
+    this.setLocalTable('data_TugasSiswa', filtered);
   }
 
   async getMaterials(grade?: GradeLevel): Promise<Material[]> {
-    const ref = collection(firestore, 'materi_belajar');
-    const q = grade ? query(ref, where('grade', '==', grade)) : query(ref);
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Material[];
+    let list = this.getLocalTable<Material>('materi_belajar');
+    if (list.length === 0) {
+      const defaults: Material[] = [
+        {
+          id: 'mat-1',
+          title: 'Mengenal Iman kepada Hari Akhir',
+          description: 'Materi PAI Kelas 9 tentang hakikat, tanda-tanda, dan hikmah beriman kepada Hari Kiamat.',
+          grade: '9',
+          category: 'Aqidah',
+          content_url: 'https://docs.google.com/document/d/1G_iMlKROJmq0UPb1Angg4IphW7BxVcron8yBEla7p2c/edit',
+          thumbnail: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=500'
+        },
+        {
+          id: 'mat-2',
+          title: 'Ketentuan Zakat Fitrah dan Zakat Mal',
+          description: 'Materi PAI Kelas 8 tentang rukun, syarat, dan tata cara pelaksanaan ibadah zakat.',
+          grade: '8',
+          category: 'Fiqih',
+          content_url: 'https://docs.google.com/document/d/1G_iMlKROJmq0UPb1Angg4IphW7BxVcron8yBEla7p2c/edit',
+          thumbnail: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=500'
+        }
+      ];
+      this.setLocalTable('materi_belajar', defaults);
+      list = defaults;
+    }
+    if (grade) {
+      return list.filter(m => m.grade === grade);
+    }
+    return list;
   }
 
   // --- EXAM & QUESTION FUNCTIONS ---
   async getExams(): Promise<Exam[]> {
-    const querySnapshot = await getDocs(query(collection(firestore, 'ujian'), orderBy('created_at', 'asc')));
-    return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Exam[];
+    const list = this.getLocalTable<Exam>('ujian');
+    return list.sort((a, b) => a.created_at.localeCompare(b.created_at));
   }
 
   async getExamById(id: string): Promise<Exam | undefined> {
-    const snap = await getDoc(doc(firestore, 'ujian', id));
-    if (!snap.exists()) return undefined;
-    return { id: snap.id, ...snap.data() } as Exam;
+    const list = this.getLocalTable<Exam>('ujian');
+    return list.find(e => e.id === id);
   }
 
   async createExam(exam: Omit<Exam, 'id' | 'created_at'>): Promise<Exam> {
-    const id = doc(collection(firestore, 'ujian')).id;
+    const id = 'exam_' + Math.random().toString(36).substr(2, 9);
     const newExam = {
       ...exam,
       id,
       created_at: new Date().toISOString()
-    };
-    await setDoc(doc(firestore, 'ujian', id), newExam);
-    return newExam as Exam;
+    } as Exam;
+    const list = this.getLocalTable<Exam>('ujian');
+    list.push(newExam);
+    this.setLocalTable('ujian', list);
+    return newExam;
   }
 
   async updateExam(id: string, updates: Partial<Exam>): Promise<void> {
-    await updateDoc(doc(firestore, 'ujian', id), updates);
+    const list = this.getLocalTable<Exam>('ujian');
+    const idx = list.findIndex(e => e.id === id);
+    if (idx > -1) {
+      list[idx] = { ...list[idx], ...updates };
+      this.setLocalTable('ujian', list);
+    }
   }
 
   async updateExamStatus(id: string, status: 'draft' | 'active' | 'closed'): Promise<void> {
-    await updateDoc(doc(firestore, 'ujian', id), { status });
+    await this.updateExam(id, { status });
   }
 
   async deleteExam(id: string): Promise<void> {
-    await deleteDoc(doc(firestore, 'ujian', id));
+    const list = this.getLocalTable<Exam>('ujian');
+    const filtered = list.filter(e => e.id !== id);
+    this.setLocalTable('ujian', filtered);
+    await this.deleteAllQuestionsByExamId(id);
   }
 
   async getQuestionsByExamId(examId: string): Promise<Question[]> {
-    const q = query(collection(firestore, 'bank_soal'), where('exam_id', '==', examId));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Question[];
+    const list = this.getLocalTable<Question>('bank_soal');
+    return list.filter(q => q.exam_id === examId);
   }
 
   async addQuestion(question: Omit<Question, 'id'>): Promise<Question> {
-    const id = doc(collection(firestore, 'bank_soal')).id;
-    const newQuestion = { ...question, id };
-    await setDoc(doc(firestore, 'bank_soal', id), newQuestion);
-    return newQuestion as Question;
+    const id = 'q_' + Math.random().toString(36).substr(2, 9);
+    const newQuestion = { ...question, id } as Question;
+    const list = this.getLocalTable<Question>('bank_soal');
+    list.push(newQuestion);
+    this.setLocalTable('bank_soal', list);
+    return newQuestion;
   }
 
   async updateQuestion(id: string, updates: Partial<Question>): Promise<void> {
-    await updateDoc(doc(firestore, 'bank_soal', id), updates);
+    const list = this.getLocalTable<Question>('bank_soal');
+    const idx = list.findIndex(q => q.id === id);
+    if (idx > -1) {
+      list[idx] = { ...list[idx], ...updates };
+      this.setLocalTable('bank_soal', list);
+    }
   }
 
   async deleteQuestion(id: string): Promise<void> {
-    await deleteDoc(doc(firestore, 'bank_soal', id));
+    const list = this.getLocalTable<Question>('bank_soal');
+    const filtered = list.filter(q => q.id !== id);
+    this.setLocalTable('bank_soal', filtered);
   }
 
   async deleteAllQuestionsByExamId(examId: string): Promise<void> {
-    const questions = await this.getQuestionsByExamId(examId);
-    for (const q of questions) {
-      await deleteDoc(doc(firestore, 'bank_soal', q.id));
-    }
+    const list = this.getLocalTable<Question>('bank_soal');
+    const filtered = list.filter(q => q.exam_id !== examId);
+    this.setLocalTable('bank_soal', filtered);
   }
 
   // --- student exam view ---
   async getAllActiveExams(): Promise<Exam[]> {
-    const q = query(collection(firestore, 'ujian'), where('status', '==', 'active'));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Exam[];
+    const list = this.getLocalTable<Exam>('ujian');
+    return list.filter(e => e.status === 'active');
   }
 
   async getActiveExamsByGrade(grade: string, semester: string): Promise<Exam[]> {
-    const q = query(
-      collection(firestore, 'ujian'), 
-      where('status', '==', 'active'),
-      where('grade', '==', grade),
-      where('semester', '==', String(semester))
-    );
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Exam[];
+    const list = this.getLocalTable<Exam>('ujian');
+    return list.filter(e => e.status === 'active' && e.grade === grade && String(e.semester) === String(semester));
   }
 
   async checkStudentExamResult(nis: string, examId: string): Promise<boolean> {
-    const q = query(
-      collection(firestore, 'hasil_ujian'),
-      where('student_nis', '==', nis),
-      where('exam_id', '==', examId),
-      limit(1)
-    );
-    const querySnapshot = await getDocs(q);
-    return !querySnapshot.empty;
+    const list = this.getLocalTable<ExamResult>('hasil_ujian');
+    return list.some(r => r.student_nis === nis && r.exam_id === examId);
   }
 
   async hasExamResults(examId: string): Promise<boolean> {
-    const q = query(collection(firestore, 'hasil_ujian'), where('exam_id', '==', examId), limit(1));
-    const querySnapshot = await getDocs(q);
-    return !querySnapshot.empty;
+    const list = this.getLocalTable<ExamResult>('hasil_ujian');
+    return list.some(r => r.exam_id === examId);
   }
 
   async submitExamResult(result: Omit<ExamResult, 'id' | 'submitted_at'>): Promise<ExamResult> {
-    const id = doc(collection(firestore, 'hasil_ujian')).id;
+    const id = 'res_' + Math.random().toString(36).substr(2, 9);
     const newResult = {
       ...result,
       id,
       submitted_at: new Date().toISOString()
-    };
-    await setDoc(doc(firestore, 'hasil_ujian', id), newResult);
+    } as ExamResult;
+    const list = this.getLocalTable<ExamResult>('hasil_ujian');
+    list.push(newResult);
+    this.setLocalTable('hasil_ujian', list);
 
-    // Integrasi ke Buku Nilai
     try {
       const student = await this.getStudentByNIS(result.student_nis);
       const exam = await this.getExamById(result.exam_id);
@@ -615,24 +642,22 @@ class DatabaseService {
       console.error("Gagal melakukan auto-grading:", e);
     }
 
-    return newResult as ExamResult;
+    return newResult;
   }
 
   async getExamResults(grade?: string, semester?: string): Promise<any[]> {
-    const ref = collection(firestore, 'hasil_ujian');
-    const querySnapshot = await getDocs(ref);
-    let results = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+    const list = this.getLocalTable<ExamResult>('hasil_ujian');
+    let filtered = list;
 
     if (semester) {
-      results = results.filter(r => String(r.semester) === String(semester));
+      filtered = filtered.filter(r => String(r.semester) === String(semester));
     }
     if (grade) {
-      results = results.filter(r => r.student_class && r.student_class.startsWith(`${grade}.`));
+      filtered = filtered.filter(r => r.student_class && r.student_class.startsWith(`${grade}.`));
     }
 
-    // Ambil detail judul ujian dari memori untuk melengkapi objek
     const exams = await this.getExams();
-    return results.map(r => {
+    return filtered.map(r => {
       const ex = exams.find(e => e.id === r.exam_id);
       return {
         ...r,
@@ -642,29 +667,21 @@ class DatabaseService {
   }
 
   async deleteExamResult(id: string): Promise<void> {
-    const snap = await getDoc(doc(firestore, 'hasil_ujian', id));
-    if (snap.exists()) {
-      const resData = snap.data();
+    const list = this.getLocalTable<ExamResult>('hasil_ujian');
+    const targetIdx = list.findIndex(r => r.id === id);
+    if (targetIdx > -1) {
+      const resData = list[targetIdx];
       const student = await this.getStudentByNIS(resData.student_nis);
       const exam = await this.getExamById(resData.exam_id);
 
       if (student && student.id && exam) {
-        // Hapus nilai terkait
-        const q = query(
-          collection(firestore, 'Nilai'),
-          where('student_id', '==', student.id)
-        );
-        const qSnap = await getDocs(q);
-        const matchTitle = exam.title;
-        for (const gd of qSnap.docs) {
-          const dDesc = gd.data().description;
-          if (dDesc === matchTitle) {
-            await deleteDoc(doc(firestore, 'Nilai', gd.id));
-          }
-        }
+        const grades = this.getLocalTable<GradeRecord>('Nilai');
+        const filteredGrades = grades.filter(g => !(g.student_id === student.id && g.description === exam.title));
+        this.setLocalTable('Nilai', filteredGrades);
       }
+      list.splice(targetIdx, 1);
+      this.setLocalTable('hasil_ujian', list);
     }
-    await deleteDoc(doc(firestore, 'hasil_ujian', id));
   }
 }
 

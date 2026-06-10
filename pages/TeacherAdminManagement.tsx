@@ -166,16 +166,76 @@ const TeacherAdminManagement: React.FC = () => {
         idToSave = parts[1].split('/')[0];
       }
     }
-    await db.setSpreadsheetId(idToSave);
-    setSpreadsheetId(idToSave);
-    setManualSheetId('');
-    Swal.fire({
-      icon: 'success',
-      title: 'ID Spreadsheet Disimpan',
-      text: 'Database disinkronkan ke Spreadsheet ID yang dimasukkan.',
-      confirmButtonColor: '#059669',
-      heightAuto: false
-    });
+
+    setSheetsLoading(true);
+    try {
+      await db.setSpreadsheetId(idToSave);
+      setSpreadsheetId(idToSave);
+      
+      if (googleToken) {
+        Swal.fire({
+          title: 'Mempersiapkan Spreadsheet...',
+          text: 'Mengonfigurasi struktur tabel & kolom di Google Sheets...',
+          allowOutsideClick: false,
+          didOpen: () => Swal.showLoading(),
+          heightAuto: false
+        });
+        
+        // Inisialisasi sheet dan header di spreadsheet kosong milik user
+        await db.initializeExistingSpreadsheet(idToSave, googleToken);
+        
+        // Tanya user apakah ingin langsung ekspor data lokal ke Sheets
+        const exportConfirm = await Swal.fire({
+          icon: 'success',
+          title: 'Koneksi Berhasil!',
+          text: 'Google Sheets Anda berhasil terhubung dan diinisialisasi struktur datanya. Kirim data terbaru saat ini ke Google Sheets?',
+          showCancelButton: true,
+          confirmButtonColor: '#059669',
+          cancelButtonColor: '#2563eb',
+          confirmButtonText: 'Ya, Ekspor Sekarang',
+          cancelButtonText: 'Lewati',
+          heightAuto: false
+        });
+        
+        if (exportConfirm.isConfirmed) {
+          Swal.fire({
+            title: 'Menyinkronkan...',
+            text: 'Mengekspor data portal ke Google Sheets...',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading(),
+            heightAuto: false
+          });
+          await db.syncToGoogleSheets(googleToken);
+          Swal.fire({
+            icon: 'success',
+            title: 'Ekspor Berhasil',
+            text: 'Seluruh database lokal berhasil disinkronisasikan ke Google Sheets Anda!',
+            confirmButtonColor: '#059669',
+            heightAuto: false
+          });
+        }
+      } else {
+        Swal.fire({
+          icon: 'success',
+          title: 'ID Spreadsheet Disimpan',
+          text: 'ID disimpan di sesi. Silakan "Hubungkan Akun Google Belajar" terlebih dahulu di Langkah 1 untuk menginisialisasi atau mensinkronkan data.',
+          confirmButtonColor: '#059669',
+          heightAuto: false
+        });
+      }
+      setManualSheetId('');
+    } catch (err: any) {
+      console.error("Gagal menautkan spreadsheet:", err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Tautan Gagal',
+        text: err.message || 'Gagal menyambungkan atau menginisialisasi spreadsheet tersebut. Pastikan ID valid dan akun Google Anda memiliki akses pengeditan.',
+        confirmButtonColor: '#dc2626',
+        heightAuto: false
+      });
+    } finally {
+      setSheetsLoading(false);
+    }
   };
 
   const handleDisconnectSpreadsheet = async () => {
