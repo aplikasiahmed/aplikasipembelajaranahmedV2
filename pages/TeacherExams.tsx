@@ -252,16 +252,30 @@ const TeacherExams: React.FC = () => {
             // Opsional: Set status closed atau ubah judul untuk menandakan archived
             await db.updateExamStatus(exam.id, 'closed');
             
-            Swal.fire({
-                icon: 'success',
-                title: 'Diarsipkan',
-                text: 'Tugas memiliki data hasil siswa. Hanya soal yang dihapus untuk menjaga arsip nilai.',
-                heightAuto: false
-            });
+            Swal.close();
+            setTimeout(() => {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Diarsipkan',
+                    text: 'Tugas memiliki data hasil siswa. Hanya soal yang dihapus untuk menjaga arsip nilai.',
+                    confirmButtonColor: '#059669',
+                    heightAuto: false
+                });
+            }, 150);
         } else {
             // JIKA TIDAK ADA HASIL: HAPUS SEMUA (CLEAN DELETE)
             await db.deleteExam(exam.id);
-            Swal.fire({ icon: 'success', title: 'Terhapus', text: 'Data tugas berhasil dihapus permanen.', timer: 1500, showConfirmButton: false, heightAuto: false });
+            Swal.close();
+            setTimeout(() => {
+                Swal.fire({ 
+                    icon: 'success', 
+                    title: 'Terhapus', 
+                    text: 'Data tugas berhasil dihapus permanen.', 
+                    timer: 1500, 
+                    showConfirmButton: false, 
+                    heightAuto: false 
+                });
+            }, 150);
         }
         
         fetchExams();

@@ -13,7 +13,8 @@ import {
   FileUp,
   AlertTriangle,
   Files,
-  Filter
+  Filter,
+  RefreshCw
 } from 'lucide-react';
 import { db } from '../services/supabaseMock';
 import Swal from 'sweetalert2';
@@ -41,9 +42,67 @@ const TeacherReports: React.FC = () => {
   const [monthAbsenEnd, setMonthAbsenEnd] = useState(''); // Sampai Bulan
   const [yearAbsen, setYearAbsen] = useState(new Date().getFullYear().toString());
 
+  const [appsScriptUrl, setAppsScriptUrl] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
   useEffect(() => {
     fetchAllKelas();
+    db.getAppsScriptUrl().then(url => setAppsScriptUrl(url));
   }, []);
+
+  const handleSyncFromSheets = async () => {
+    Swal.fire({
+      title: 'Konfirmasi Tarik Data',
+      text: 'Yakin anda ingin menambahkan/sinkronisasi data siswa dari Google Sheets?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Ya, Tarik Data',
+      cancelButtonText: 'Batal',
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#64748b',
+      heightAuto: false
+    }).then(async (result) => {
+      if (!result.isConfirmed) return;
+
+      setSyncing(true);
+      Swal.fire({
+        title: 'Menarik data...',
+        text: 'Sedang mengimpor data terbaru dari Google Sheets...',
+        didOpen: () => Swal.showLoading(),
+        allowOutsideClick: false,
+        heightAuto: false
+      });
+      try {
+        await db.syncFromGoogleSheets();
+        Swal.close();
+        setTimeout(() => {
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil Tarik Data!',
+            text: 'Data siswa dan tabel pendukung telah berhasil ditarik dari spreadsheet.',
+            timer: 2000,
+            showConfirmButton: false,
+            heightAuto: false
+          });
+        }, 150);
+        fetchAllKelas();
+      } catch (e: any) {
+        console.error(e);
+        Swal.close();
+        setTimeout(() => {
+          Swal.fire({
+            icon: 'error',
+            title: 'Gagal Tarik Data',
+            text: 'Terjadi kesalahan saat menghubungi Google Sheets. Silakan periksa koneksi atau URL Apps Script Anda.',
+            confirmButtonColor: '#dc2626',
+            heightAuto: false
+          });
+        }, 150);
+      } finally {
+        setSyncing(false);
+      }
+    });
+  };
 
   // Auto-set Semester Absensi berdasarkan Bulan Awal
   useEffect(() => {
@@ -204,7 +263,15 @@ const TeacherReports: React.FC = () => {
         }
 
         if (!rawData || rawData.length === 0) {
-          Swal.fire('Kosong', `Data nilai Semester ${targetSem} belum tersedia.`, 'info');
+          Swal.close();
+          setTimeout(() => {
+            Swal.fire({
+              icon: 'info',
+              title: 'Kosong',
+              text: `Data nilai Semester ${targetSem} belum tersedia.`,
+              heightAuto: false
+            });
+          }, 150);
           return;
         }
 
@@ -233,6 +300,7 @@ const TeacherReports: React.FC = () => {
               kelas: targetKelas, 
               semester: targetSem === '1' ? '1 (Ganjil)' : '2 (Genap)' 
           });
+          Swal.close();
         }
       } else {
         // ABSENSI SINGLE (LOGIKA LAMA TETAP DIPERTAHANKAN)
@@ -240,7 +308,15 @@ const TeacherReports: React.FC = () => {
         const attendance = await db.getAttendanceByKelas(targetKelas, targetSem, monthAbsen, yearAbsen);
 
         if (!attendance || attendance.length === 0) {
-          Swal.fire('Kosong', 'Data absensi bulan ini belum tersedia.', 'info');
+          Swal.close();
+          setTimeout(() => {
+            Swal.fire({
+              icon: 'info',
+              title: 'Kosong',
+              text: 'Data absensi bulan ini belum tersedia.',
+              heightAuto: false
+            });
+          }, 150);
           return;
         }
 
@@ -281,11 +357,20 @@ const TeacherReports: React.FC = () => {
             bulan: formatBulan(monthAbsen),
             tahun: yearAbsen
           });
+          Swal.close();
         }
       }
     } catch (err) {
       console.error(err);
-      Swal.fire('Error', 'Gagal memproses laporan.', 'error');
+      Swal.close();
+      setTimeout(() => {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Gagal memproses laporan.',
+          heightAuto: false
+        });
+      }, 150);
     }
   };
 
@@ -399,7 +484,15 @@ const TeacherReports: React.FC = () => {
         }
 
         if (batchData.length === 0) {
-            Swal.fire('Data Tidak Ditemukan', 'Tidak ada data di periode yang dipilih untuk semua kelas.', 'info');
+            Swal.close();
+            setTimeout(() => {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Data Tidak Ditemukan',
+                    text: 'Tidak ada data di periode yang dipilih untuk semua kelas.',
+                    heightAuto: false
+                });
+            }, 150);
             return;
         }
 
@@ -411,11 +504,21 @@ const TeacherReports: React.FC = () => {
             Swal.close();
         } else {
             generateBatchPDFReport(category, batchData);
+            Swal.close();
         }
 
     } catch (error) {
         console.error("Batch Export Error", error);
-        Swal.fire('Gagal', 'Terjadi kesalahan saat memproses data masal.', 'error');
+        Swal.close();
+        setTimeout(() => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal',
+                text: 'Terjadi kesalahan saat memproses data masal.',
+                confirmButtonColor: '#dc2626',
+                heightAuto: false
+            });
+        }, 150);
     }
   };
 
@@ -423,35 +526,83 @@ const TeacherReports: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
-
-        if (data.length === 0) throw new Error("File kosong.");
-
-        Swal.fire({ title: 'Mengimpor...', didOpen: () => Swal.showLoading(), heightAuto: false });
-
-        const students = data.map((row, idx) => ({
-          nis: String(row.NIS || row.nis),
-          namalengkap: String(row.NAMA || row.nama || row['NAMA SISWA']),
-          jeniskelamin: String(row.JK || row.jk),
-          kelas: String(row.KELAS || row.kelas)
-        }));
-
-        await db.upsertStudents(students);
-        Swal.fire('Berhasil', `${students.length} data siswa diperbarui.`, 'success');
-        fetchAllKelas();
-      } catch (err) {
-        Swal.fire('Gagal', 'Format file tidak sesuai template.', 'error');
+    Swal.fire({
+      title: 'Konfirmasi Impor',
+      text: 'Yakin anda ingin menambahkan data siswa dari file Excel ini?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Ya, Impor',
+      cancelButtonText: 'Batal',
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#64748b',
+      heightAuto: false
+    }).then((result) => {
+      if (!result.isConfirmed) {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
       }
-    };
-    reader.readAsBinaryString(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const bstr = evt.target?.result;
+          const wb = XLSX.read(bstr, { type: 'binary' });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+          if (data.length === 0) throw new Error("File kosong.");
+
+          Swal.fire({
+            title: 'Mengimpor...',
+            text: 'Sedang mendaftarkan data siswa baru...',
+            didOpen: () => {
+              Swal.showLoading();
+            },
+            allowOutsideClick: false,
+            heightAuto: false
+          });
+
+          const students = data.map((row, idx) => {
+            const rowId = row.ID || row.id || row.Id;
+            return {
+              id: rowId ? String(rowId).trim() : undefined,
+              nis: String(row.NIS || row.nis),
+              namalengkap: String(row.NAMA || row.nama || row['NAMA SISWA']),
+              jeniskelamin: String(row.JK || row.jk),
+              kelas: String(row.KELAS || row.kelas)
+            };
+          });
+
+          await db.upsertStudents(students);
+          
+          Swal.close();
+          setTimeout(() => {
+            Swal.fire({
+              icon: 'success',
+              title: 'Berhasil',
+              text: `${students.length} data siswa diperbarui.`,
+              confirmButtonColor: '#059669',
+              heightAuto: false
+            });
+          }, 150);
+          fetchAllKelas();
+        } catch (err) {
+          Swal.close();
+          setTimeout(() => {
+            Swal.fire({
+              icon: 'error',
+              title: 'Gagal',
+              text: 'Format file tidak sesuai template.',
+              confirmButtonColor: '#dc2626',
+              heightAuto: false
+            });
+          }, 150);
+        }
+      };
+      reader.readAsBinaryString(file);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    });
   };
 
   const downloadTemplate = () => {
@@ -493,11 +644,38 @@ const TeacherReports: React.FC = () => {
         else if (type === 'tugas') await db.resetTasks();
         else if (type === 'siswa') await db.resetStudents();
         else await db.resetAllData();
-        Swal.fire('Berhasil', 'Data telah dibersihkan.', 'success');
+        
+        Swal.close();
+        setTimeout(() => {
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil',
+            text: 'Data telah dibersihkan.',
+            confirmButtonColor: '#059669',
+            heightAuto: false
+          });
+        }, 150);
         fetchAllKelas();
-      } catch (err) { Swal.fire('Error', 'Gagal terhubung server.', 'error'); }
+      } catch (err) {
+        Swal.close();
+        setTimeout(() => {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Gagal terhubung server.',
+            confirmButtonColor: '#dc2626',
+            heightAuto: false
+          });
+        }, 150);
+      }
     } else if (token !== undefined) {
-      Swal.fire('Ditolak', 'Token Keamanan Salah!', 'error');
+      Swal.fire({
+        icon: 'error',
+        title: 'Ditolak',
+        text: 'Token Keamanan Salah!',
+        confirmButtonColor: '#dc2626',
+        heightAuto: false
+      });
     }
   };
 
@@ -680,20 +858,57 @@ const TeacherReports: React.FC = () => {
         </div>
 
         {/* IMPORT SISWA */}
-        <div className="bg-white p-4 md:p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-3 md:space-y-4">
+        <div className="bg-white p-4 md:p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-50 text-blue-600 rounded-xl"><FileUp size={18}/></div>
-            <h2 className="text-[11px] md:text-sm font-black uppercase tracking-widest text-slate-800">Import Siswa</h2>
+            <h2 className="text-[11px] md:text-sm font-black uppercase tracking-widest text-slate-800">Kelola & Import Siswa</h2>
           </div>
-          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-start gap-2">
-            <Info size={14} className="text-blue-500 mt-0.5 shrink-0" />
-            <p className="text-[9px] text-slate-500 leading-tight">Download template, isi data, lalu upload kembali ke database.</p>
+
+          {/* PETUNJUK GOOGLE SHEETS */}
+          <div className="p-4 bg-emerald-50/70 border border-emerald-100 rounded-2xl space-y-2">
+            <h3 className="text-[10px] font-black text-emerald-850 uppercase tracking-wider flex items-center gap-1">
+              💡 Cara Memasukkan 500 Siswa Via Google Sheets
+            </h3>
+            <ol className="list-decimal list-inside text-[9px] md:text-xs text-slate-600 space-y-1 leading-normal">
+              <li>Buka file Google Spreadsheet Anda, aktifkan tab <strong>"data_siswa"</strong>.</li>
+              <li>Tulis / Paste data 500+ siswa Anda secara sekaligus ke kolom yang tersedia:
+                <div className="mt-1 flex flex-wrap gap-1 font-mono text-[8px] md:text-[10px] text-emerald-800 bg-white/80 p-1 md:p-2 rounded-lg border border-emerald-100">
+                  <span>id</span> | <span>nis</span> | <span>namalengkap</span> | <span>kelas</span> | <span>jeniskelamin</span>
+                </div>
+                <span className="text-[8px] text-slate-400 block mt-0.5">*Catatan: Isi <code className="bg-slate-100 px-0.5 py-0.2 rounded text-[7px]">jeniskelamin</code> dengan <strong className="text-slate-600">L</strong> (Laki-laki) atau <strong className="text-slate-600">P</strong> (Perempuan)</span>
+              </li>
+              <li>Setelah data terisi lengkap di spreadsheet, klik tombol <strong>"Tarik Data dari Google Sheets"</strong> di bawah ini untuk memuatnya secara instan ke web portal!</li>
+            </ol>
           </div>
-          <div className="grid grid-cols-1 gap-2">
-            <button onClick={downloadTemplate} className="w-full p-2.5 bg-slate-100 text-slate-800 rounded-2xl text-[9px] font-black uppercase flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"><Download size={14}/> Template Excel</button>
-            <div className="relative">
-              <input type="file" ref={fileInputRef} onChange={handleImportExcel} accept=".xlsx, .xls" className="hidden" />
-              <button onClick={() => fileInputRef.current?.click()} className="w-full p-3.5 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-all"><Upload size={14}/> Upload Data Siswa</button>
+
+          <div className="space-y-2.5">
+            {appsScriptUrl ? (
+              <button 
+                onClick={handleSyncFromSheets} 
+                disabled={syncing}
+                className="w-full p-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 hover:bg-emerald-500 transition-all"
+              >
+                <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+                {syncing ? 'Sedang Mensinkronkan...' : 'Tarik Data dari Google Sheets'}
+              </button>
+            ) : (
+              <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-[9px] text-amber-700 leading-tight">
+                Hubungkan Web App URL Google Apps Script Anda di menu Kelola Admin terlebih dahulu untuk mengaktifkan fitur penarikan data langsung dari Google Sheets.
+              </div>
+            )}
+
+            <div className="relative flex items-center my-2">
+              <div className="flex-grow border-t border-slate-100"></div>
+              <span className="flex-shrink mx-3 text-[8px] font-black text-slate-300 uppercase tracking-widest">Atau via Offline Excel</span>
+              <div className="flex-grow border-t border-slate-100"></div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <button onClick={downloadTemplate} className="w-full p-2.5 bg-slate-100 text-slate-800 rounded-2xl text-[9px] font-black uppercase flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"><Download size={14}/> Template Excel</button>
+              <div className="relative">
+                <input type="file" ref={fileInputRef} onChange={handleImportExcel} accept=".xlsx, .xls" className="hidden" />
+                <button onClick={() => fileInputRef.current?.click()} className="w-full p-2.5 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase flex items-center justify-center gap-1.5 shadow-md hover:bg-blue-500 active:scale-95 transition-all"><Upload size={14}/> Upload Excel</button>
+              </div>
             </div>
           </div>
         </div>

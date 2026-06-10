@@ -7,7 +7,7 @@ interface SheetConfig {
 }
 
 const TABS_CONFIG: SheetConfig[] = [
-  { name: 'admin_users', headers: ['id', 'username', 'fullname', 'role', 'created_at'] },
+  { name: 'admin_users', headers: ['id', 'username', 'fullname', 'password', 'role', 'created_at'] },
   { name: 'data_siswa', headers: ['id', 'nis', 'namalengkap', 'kelas', 'jeniskelamin'] },
   { name: 'Nilai', headers: ['id', 'student_id', 'subject_type', 'score', 'description', 'kelas', 'semester', 'created_at'] },
   { name: 'kehadiran', headers: ['id', 'student_id', 'nama_siswa', 'nis', 'kelas', 'date', 'status', 'semester'] },
@@ -19,6 +19,7 @@ const TABS_CONFIG: SheetConfig[] = [
 ];
 
 class DatabaseService {
+  private isSyncingFromSheets = false;
   // HELPER LOKAL DATASTORAGE (LOCALSTORAGE)
   private getLocalTable<T>(name: string): T[] {
     const key = `pai_db_${name}`;
@@ -34,6 +35,21 @@ class DatabaseService {
   private setLocalTable<T>(name: string, data: T[]): void {
     const key = `pai_db_${name}`;
     localStorage.setItem(key, JSON.stringify(data));
+    
+    // Auto-sync in background to Google Sheets if not pulling from sheets
+    if (!this.isSyncingFromSheets) {
+      this.getAppsScriptUrl().then(appsScriptUrl => {
+        const token = localStorage.getItem('google_oauth_token') || undefined;
+        if (appsScriptUrl || token) {
+          const isTableValid = TABS_CONFIG.some(cfg => cfg.name === name);
+          if (isTableValid) {
+            this.syncTableToGoogleSheets(name, token).catch(err => {
+              console.error(`Auto-sync background error for sheet ${name}:`, err);
+            });
+          }
+        }
+      });
+    }
   }
 
   // SPREADSHEET ID CONFIGURATION
@@ -46,6 +62,18 @@ class DatabaseService {
       localStorage.setItem('google_spreadsheet_id', id);
     } else {
       localStorage.removeItem('google_spreadsheet_id');
+    }
+  }
+
+  async getAppsScriptUrl(): Promise<string | null> {
+    return localStorage.getItem('google_apps_script_url') || null;
+  }
+
+  async setAppsScriptUrl(url: string | null): Promise<void> {
+    if (url) {
+      localStorage.setItem('google_apps_script_url', url);
+    } else {
+      localStorage.removeItem('google_apps_script_url');
     }
   }
 
@@ -174,13 +202,47 @@ class DatabaseService {
   }
 
   // Sinkronisasi lokal (LocalStorage) -> Google Sheets
-  async syncToGoogleSheets(accessToken: string): Promise<void> {
+  async syncToGoogleSheets(accessToken?: string): Promise<void> {
+    const appsScriptUrl = await this.getAppsScriptUrl();
+    if (appsScriptUrl) {
+      for (const cfg of TABS_CONFIG) {
+        const items = this.getLocalTable(cfg.name);
+        const values: any[][] = [cfg.headers];
+        
+        items.forEach((item: any) => {
+          const row = cfg.headers.map(header => {
+            const val = item[header];
+            if (val === undefined || val === null) return '';
+            if (typeof val === 'object') return JSON.stringify(val);
+            return val;
+          });
+          values.push(row);
+        });
+
+        const res = await fetch(appsScriptUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain'
+          },
+          body: JSON.stringify({
+            sheet: cfg.name,
+            values: values
+          })
+        });
+        if (!res.ok) {
+          throw new Error(`Koneksi ke Apps Script gagal dengan status HTTP ${res.status}`);
+        }
+      }
+      return;
+    }
+
+    const token = accessToken || localStorage.getItem('google_oauth_token') || '';
     const spreadsheetId = await this.getSpreadsheetId();
     if (!spreadsheetId) {
       throw new Error("Spreadsheet ID belum terkonfigurasi!");
     }
 
-    await this.initializeExistingSpreadsheet(spreadsheetId, accessToken);
+    await this.initializeExistingSpreadsheet(spreadsheetId, token);
 
     for (const cfg of TABS_CONFIG) {
       const items = this.getLocalTable(cfg.name);
@@ -203,21 +265,161 @@ class DatabaseService {
           majorDimension: 'ROWS',
           values: values
         })
-      }, accessToken);
+      }, token);
     }
   }
 
-  // Sinkronisasi Google Sheets -> lokal (LocalStorage)
-  async syncFromGoogleSheets(accessToken: string): Promise<void> {
+  // Sinkronisasi khusus SATU tabel lokal -> Google Sheets (Hemat kuota API & Sangat Cepat!)
+  async syncTableToGoogleSheets(tableName: string, accessToken?: string): Promise<void> {
+    const appsScriptUrl = await this.getAppsScriptUrl();
+    if (appsScriptUrl) {
+      const cfg = TABS_CONFIG.find(c => c.name === tableName);
+      if (!cfg) return;
+
+      const items = this.getLocalTable(cfg.name);
+      const values: any[][] = [cfg.headers];
+      
+      items.forEach((item: any) => {
+        const row = cfg.headers.map(header => {
+          const val = item[header];
+          if (val === undefined || val === null) return '';
+          if (typeof val === 'object') return JSON.stringify(val);
+          return val;
+        });
+        values.push(row);
+      });
+
+      const res = await fetch(appsScriptUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: JSON.stringify({
+          sheet: tableName,
+          values: values
+        })
+      });
+      if (!res.ok) {
+        throw new Error(`Koneksi ke Apps Script gagal dengan status HTTP ${res.status}`);
+      }
+      return;
+    }
+
+    const token = accessToken || localStorage.getItem('google_oauth_token') || '';
     const spreadsheetId = await this.getSpreadsheetId();
     if (!spreadsheetId) {
       throw new Error("Spreadsheet ID belum terkonfigurasi!");
     }
 
-    await this.initializeExistingSpreadsheet(spreadsheetId, accessToken);
+    const cfg = TABS_CONFIG.find(c => c.name === tableName);
+    if (!cfg) return;
+
+    try {
+      // 1. Ambil metadata untuk cek apakah sheet dengan nama tableName sudah ada
+      const metadata = await this.fetchSheetsAPI(spreadsheetId, '?fields=sheets.properties', { method: 'GET' }, token);
+      const existingSheetNames = (metadata.sheets || []).map((s: any) => s.properties.title);
+
+      // 2. Jika belum ada, buat sheet-nya
+      if (!existingSheetNames.includes(tableName)) {
+        await this.fetchSheetsAPI(spreadsheetId, ':batchUpdate', {
+          method: 'POST',
+          body: JSON.stringify({
+            requests: [{
+              addSheet: {
+                properties: {
+                  title: tableName
+                }
+              }
+            }]
+          })
+        }, token);
+      }
+
+      // 3. Ambil data lokal dan masukkan ke values (termasuk headers sebagai baris pertama)
+      const items = this.getLocalTable(cfg.name);
+      const values: any[][] = [cfg.headers];
+      
+      items.forEach((item: any) => {
+        const row = cfg.headers.map(header => {
+          const val = item[header];
+          if (val === undefined || val === null) return '';
+          if (typeof val === 'object') return JSON.stringify(val);
+          return val;
+        });
+        values.push(row);
+      });
+
+      // 4. Update data dalam sekali panggil PUT API
+      await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z5000?valueInputOption=USER_ENTERED`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          range: `${cfg.name}!A1:Z5000`,
+          majorDimension: 'ROWS',
+          values: values
+        })
+      }, token);
+
+      console.log(`Berhasil menyinkronkan tabel ${tableName} ke Google Sheets.`);
+    } catch (err: any) {
+      console.error(`Gagal menyinkronkan tabel ${tableName} ke Google Sheets:`, err);
+      throw err;
+    }
+  }
+
+  // Sinkronisasi Google Sheets -> lokal (LocalStorage)
+  async syncFromGoogleSheets(accessToken?: string): Promise<void> {
+    this.isSyncingFromSheets = true;
+    try {
+      const appsScriptUrl = await this.getAppsScriptUrl();
+    if (appsScriptUrl) {
+      for (const cfg of TABS_CONFIG) {
+        try {
+          const res = await fetch(`${appsScriptUrl}?sheet=${encodeURIComponent(cfg.name)}`, { method: 'GET' });
+          if (res.ok) {
+            const json = await res.json();
+            const rows: any[][] = json.values || [];
+            if (rows.length > 1) {
+              const headers = rows[0];
+              const items: any[] = [];
+              for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (row.length === 0 || !row[0]) continue;
+                const obj: any = {};
+                headers.forEach((header, colIdx) => {
+                  let cellVal = row[colIdx];
+                  if (cellVal === undefined || cellVal === null) cellVal = '';
+                  
+                  if (typeof cellVal === 'string' && (cellVal.startsWith('[') || cellVal.startsWith('{'))) {
+                    try {
+                      cellVal = JSON.parse(cellVal);
+                    } catch (_) {}
+                  }
+                  obj[header] = cellVal;
+                });
+                items.push(obj);
+              }
+              if (items.length > 0) {
+                this.setLocalTable(cfg.name, items);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn(`Gagal menarik data ${cfg.name} via Apps Script:`, e);
+        }
+      }
+      return;
+    }
+
+    const token = accessToken || localStorage.getItem('google_oauth_token') || '';
+    const spreadsheetId = await this.getSpreadsheetId();
+    if (!spreadsheetId) {
+      throw new Error("Spreadsheet ID belum terkonfigurasi!");
+    }
+
+    await this.initializeExistingSpreadsheet(spreadsheetId, token);
 
     for (const cfg of TABS_CONFIG) {
-      const res = await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z5000`, { method: 'GET' }, accessToken);
+      const res = await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z5000`, { method: 'GET' }, token);
       const rows: any[][] = res.values || [];
       if (rows.length <= 1) continue;
       
@@ -246,13 +448,141 @@ class DatabaseService {
 
       this.setLocalTable(cfg.name, items);
     }
+    } finally {
+      this.isSyncingFromSheets = false;
+    }
   }
 
   // --- ADMIN FUNCTIONS ---
   async verifyAdminLogin(username: string, password: string): Promise<AdminUser | null> {
+    let isSynced = false;
+    this.isSyncingFromSheets = true;
+    try {
+      // Langkah 1: Cek Google Apps Script Web App URL jika tersedia
+    const appsScriptUrl = await this.getAppsScriptUrl();
+    if (appsScriptUrl) {
+      try {
+        const res = await fetch(`${appsScriptUrl}?sheet=admin_users`, { method: 'GET' });
+        if (res.ok) {
+          const json = await res.json();
+          const rows: any[][] = json.values || [];
+          if (rows.length > 1) {
+            const headers = rows[0];
+            const items: any[] = [];
+            for (let i = 1; i < rows.length; i++) {
+              const row = rows[i];
+              if (row.length === 0 || !row[0]) continue;
+              const obj: any = {};
+              headers.forEach((header, colIdx) => {
+                let cellVal = row[colIdx];
+                if (cellVal === undefined || cellVal === null) cellVal = '';
+                obj[header] = cellVal;
+              });
+              items.push(obj);
+            }
+            if (items.length > 0) {
+              this.setLocalTable('admin_users', items);
+              isSynced = true;
+            }
+          }
+        }
+      } catch (eScript) {
+        console.warn("Gagal menarik data admin_users via Apps Script:", eScript);
+      }
+    }
+
+    // Langkah 2: Jika Apps Script tidak ada atau gagal, cek via Google Sheets REST API / GViz Public
+    if (!isSynced) {
+      const spreadsheetId = await this.getSpreadsheetId();
+      if (spreadsheetId) {
+        const cachedToken = localStorage.getItem('google_oauth_token');
+        
+        // Tarik data admin_users menggunakan OAuth token jika tersedia
+        if (cachedToken) {
+          try {
+            const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/admin_users!A1:Z5000`, {
+              headers: {
+                'Authorization': `Bearer ${cachedToken}`
+              }
+            });
+            if (res.ok) {
+              const data = await res.json();
+              const rows: any[][] = data.values || [];
+              if (rows.length > 1) {
+                const headers = rows[0];
+                const items: any[] = [];
+                for (let i = 1; i < rows.length; i++) {
+                  const row = rows[i];
+                  if (row.length === 0 || !row[0]) continue;
+                  const obj: any = {};
+                  headers.forEach((header, colIdx) => {
+                    let cellVal = row[colIdx];
+                    if (cellVal === undefined || cellVal === null) cellVal = '';
+                    obj[header] = cellVal;
+                  });
+                  items.push(obj);
+                }
+                if (items.length > 0) {
+                  this.setLocalTable('admin_users', items);
+                  isSynced = true;
+                }
+              }
+            }
+          } catch (eToken) {
+            console.warn("Gagal menarik data via OAuth token, mencoba metode alternatif:", eToken);
+          }
+        }
+
+        // Jika OAuth tidak terisi atau gagal, coba tarik data dari GViz Public
+        if (!isSynced) {
+          try {
+            const publicRes = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=admin_users`);
+            if (publicRes.ok) {
+              const txt = await publicRes.text();
+              const match = txt.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/);
+              if (match) {
+                const json = JSON.parse(match[1]);
+                if (json.table && json.table.rows) {
+                  const cols = json.table.cols || [];
+                  const headers = cols.map((c: any) => c.label || '').filter(Boolean);
+                  const activeHeaders = headers.length > 0 ? headers : ['id', 'username', 'fullname', 'password', 'role', 'created_at'];
+
+                  const items = json.table.rows.map((row: any) => {
+                    const obj: any = {};
+                    if (row.c) {
+                      row.c.forEach((cell: any, idx: number) => {
+                        const key = activeHeaders[idx];
+                        if (key) {
+                          let val = cell ? cell.v : null;
+                          if (val === null || val === undefined) val = '';
+                          obj[key] = String(val);
+                        }
+                      });
+                    }
+                    return obj;
+                  }).filter((item: any) => item.username);
+
+                  if (items.length > 0) {
+                    this.setLocalTable('admin_users', items);
+                    isSynced = true;
+                  }
+                }
+              }
+            }
+          } catch (ePublic) {
+            console.warn("Gagal menarik data via Google GViz Public API:", ePublic);
+          }
+        }
+      }
+    }
+
+    // Ambil data admin di cache lokal (yang terupdate) dan cek kecocokannya
     const list = await this.getAdmins();
-    const match = list.find(a => a.username === username && a.password === password);
+    const match = list.find(a => a.username === username && String(a.password) === String(password));
     return match || null;
+    } finally {
+      this.isSyncingFromSheets = false;
+    }
   }
 
   async getAdmins(): Promise<AdminUser[]> {
@@ -273,7 +603,7 @@ class DatabaseService {
     return table.sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
 
-  async addAdmin(admin: Partial<AdminUser>): Promise<void> {
+  async addAdmin(admin: Partial<AdminUser>): Promise<{ success: boolean; synced: boolean; error?: string }> {
     const id = admin.id || 'admin_' + Math.random().toString(36).substr(2, 9);
     const cleanAdmin = {
       ...admin,
@@ -288,12 +618,44 @@ class DatabaseService {
       list.push(cleanAdmin);
     }
     this.setLocalTable('admin_users', list);
+
+    let synced = false;
+    let syncError = '';
+    const appsScriptUrl = await this.getAppsScriptUrl();
+    const token = localStorage.getItem('google_oauth_token');
+    
+    if (appsScriptUrl || token) {
+      try {
+        await this.syncTableToGoogleSheets('admin_users', token || undefined);
+        synced = true;
+      } catch (err: any) {
+        console.error("Gagal melakukan auto-ekspor admin ke Google Sheets:", err);
+        syncError = err.message || String(err);
+      }
+    }
+    return { success: true, synced, error: syncError };
   }
 
-  async deleteAdmin(id: string): Promise<void> {
+  async deleteAdmin(id: string): Promise<{ success: boolean; synced: boolean; error?: string }> {
     const list = await this.getAdmins();
     const filtered = list.filter(a => a.id !== id);
     this.setLocalTable('admin_users', filtered);
+
+    let synced = false;
+    let syncError = '';
+    const appsScriptUrl = await this.getAppsScriptUrl();
+    const token = localStorage.getItem('google_oauth_token');
+    
+    if (appsScriptUrl || token) {
+      try {
+        await this.syncTableToGoogleSheets('admin_users', token || undefined);
+        synced = true;
+      } catch (err: any) {
+        console.error("Gagal melakukan auto-ekspor admin ke Google Sheets setelah penghapusan:", err);
+        syncError = err.message || String(err);
+      }
+    }
+    return { success: true, synced, error: syncError };
   }
 
   // --- STUDENT FUNCTIONS ---

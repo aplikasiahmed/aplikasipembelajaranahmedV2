@@ -151,9 +151,15 @@ const TeacherTaskCheck: React.FC = () => {
           try {
               await db.deleteTaskSubmission(task.id);
               await loadTasks(); // Reload data
-              Swal.fire({icon: 'success', title: 'Terhapus', timer: 1000, showConfirmButton: false, heightAuto: false});
+              Swal.close();
+              setTimeout(() => {
+                  Swal.fire({icon: 'success', title: 'Terhapus', timer: 1000, showConfirmButton: false, heightAuto: false});
+              }, 150);
           } catch (e) {
-              Swal.fire({icon: 'error', title: 'Gagal', text: 'Gagal menghapus data.', heightAuto: false});
+              Swal.close();
+              setTimeout(() => {
+                  Swal.fire({icon: 'error', title: 'Gagal', text: 'Gagal menghapus data.', heightAuto: false});
+              }, 150);
           }
       } else if (token !== undefined) {
           Swal.fire({ icon: 'error', title: 'Token Salah', text: 'Penghapusan dibatalkan.', heightAuto: false });
@@ -189,9 +195,20 @@ const TeacherTaskCheck: React.FC = () => {
       });
 
       if (token === "PAI_ADMIN_GURU") {
-          await db.deleteExamResult(id);
-          loadExamResults();
-          Swal.fire({icon: 'success', title: 'Terhapus', timer: 1000, showConfirmButton: false, heightAuto: false});
+          Swal.fire({ title: 'Menghapus...', didOpen: () => Swal.showLoading(), heightAuto: false });
+          try {
+              await db.deleteExamResult(id);
+              await loadExamResults();
+              Swal.close();
+              setTimeout(() => {
+                  Swal.fire({icon: 'success', title: 'Terhapus', timer: 1000, showConfirmButton: false, heightAuto: false});
+              }, 150);
+          } catch (e) {
+              Swal.close();
+              setTimeout(() => {
+                  Swal.fire({icon: 'error', title: 'Gagal', text: 'Gagal menghapus hasil ujian.', heightAuto: false});
+              }, 150);
+          }
       } else if (token !== undefined) {
           Swal.fire({ icon: 'error', title: 'Token Salah', text: 'Penghapusan dibatalkan.', heightAuto: false });
       }

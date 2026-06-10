@@ -230,7 +230,16 @@ const TeacherInputGrades: React.FC = () => {
     const studentsForTemplate = await db.getStudentsByKelas(importKelas);
 
     if (studentsForTemplate.length === 0) {
-        Swal.fire({ icon: 'error', title: 'Kelas Kosong', text: 'Tidak ada data siswa di kelas ini.', heightAuto: false });
+        Swal.close();
+        setTimeout(() => {
+          Swal.fire({
+            icon: 'error',
+            title: 'Kelas Kosong',
+            text: 'Tidak ada data siswa di kelas ini.',
+            confirmButtonColor: '#dc2626',
+            heightAuto: false
+          });
+        }, 150);
         return;
     }
 
@@ -255,7 +264,16 @@ const TeacherInputGrades: React.FC = () => {
     });
     
     Swal.close();
-    Swal.fire({ icon: 'success', title: 'Template Didownload', text: 'Silakan isi nilai menggunakan Excel.', timer: 2000, showConfirmButton: false, heightAuto: false });
+    setTimeout(() => {
+      Swal.fire({
+        icon: 'success',
+        title: 'Template Didownload',
+        text: 'Silakan isi nilai menggunakan Excel.',
+        timer: 2000,
+        showConfirmButton: false,
+        heightAuto: false
+      });
+    }, 150);
   };
 
   // Hanya memilih file dan menyimpannya ke state
@@ -362,12 +380,16 @@ const TeacherInputGrades: React.FC = () => {
           }
         }
 
-        Swal.fire({ 
-          icon: 'success', 
-          title: 'Import Berhasil', 
-          text: `${successCount} nilai berhasil disimpan ke Kelas ${importKelas}.`,
-          heightAuto: false 
-        });
+        Swal.close();
+        setTimeout(() => {
+          Swal.fire({ 
+            icon: 'success', 
+            title: 'Import Berhasil', 
+            text: `${successCount} nilai berhasil disimpan ke Kelas ${importKelas}.`,
+            confirmButtonColor: '#059669',
+            heightAuto: false 
+          });
+        }, 150);
         
         // Reset File Input
         setSelectedFile(null);
@@ -375,7 +397,16 @@ const TeacherInputGrades: React.FC = () => {
 
       } catch (err) {
         console.error(err);
-        Swal.fire('Gagal', 'Format file tidak sesuai atau terjadi kesalahan sistem.', 'error');
+        Swal.close();
+        setTimeout(() => {
+          Swal.fire({
+            icon: 'error',
+            title: 'Gagal',
+            text: 'Format file tidak sesuai atau terjadi kesalahan sistem.',
+            confirmButtonColor: '#dc2626',
+            heightAuto: false
+          });
+        }, 150);
       }
     };
     reader.readAsBinaryString(selectedFile);
