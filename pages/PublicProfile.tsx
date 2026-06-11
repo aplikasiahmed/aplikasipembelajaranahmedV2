@@ -3,7 +3,7 @@ import React from 'react';
 import { Mail, Instagram, Phone, MapPin, GraduationCap, Award, User } from 'lucide-react';
 
 const PublicProfile: React.FC = () => {
-  const profileImageUrl = "https://irqphggbsncuplifywul.supabase.co/storage/v1/object/sign/gambar/profil%20ahmad%20nawasyi%20(2)%20copy.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9kMjA2YTI2NS1hNTMwLTQ5ODktOTBhNS03Yjg2ZmNmZGM0ODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJnYW1iYXIvcHJvZmlsIGFobWFkIG5hd2FzeWkgKDIpIGNvcHkuanBnIiwiaWF0IjoxNzY5MzM0NzY1LCJleHAiOjE4NjM5NDI3NjV9.QJzrlkb5m9WovQ7Al_9dVK9tCBGlWwx4vTaHfnO8DzI";
+  const profileImageUrl = "https://lh3.googleusercontent.com/d/1LGJEfepqREAQq7-E4wNU3cH1UR8DG1rP";
 
   const education = [
     { title: "Sertifikasi Guru", school: "UIN Syarif Hidayatullah - Jakarta", year: "2025" },
