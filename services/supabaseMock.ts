@@ -52,6 +52,75 @@ class DatabaseService {
     }
   }
 
+  // Canonical Header normalizer
+  getCanonicalHeader(parsedHeader: any, expectedHeaders: string[]): string {
+    if (parsedHeader === undefined || parsedHeader === null) return '';
+    const parsedStr = parsedHeader.toString().trim();
+    const cleanParsed = parsedStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    // 1. Direct case-insensitive match or custom clean match
+    for (const expected of expectedHeaders) {
+      if (expected.toLowerCase() === parsedStr.toLowerCase()) {
+        return expected;
+      }
+      const cleanExpected = expected.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanExpected === cleanParsed) {
+        return expected;
+      }
+    }
+
+    // 2. Extra Indonesian semantic mappings if there are differences
+    if (cleanParsed === 'nama' || cleanParsed === 'namasiswa' || cleanParsed === 'namalengkap' || cleanParsed === 'fullname' || cleanParsed === 'studentname') {
+      if (expectedHeaders.includes('namalengkap')) return 'namalengkap';
+      if (expectedHeaders.includes('student_name')) return 'student_name';
+      if (expectedHeaders.includes('nama_siswa')) return 'nama_siswa';
+      if (expectedHeaders.includes('fullname')) return 'fullname';
+    }
+
+    if (cleanParsed === 'nis' || cleanParsed === 'nisn') {
+      if (expectedHeaders.includes('nis')) return 'nis';
+      if (expectedHeaders.includes('nisn')) return 'nisn';
+      if (expectedHeaders.includes('student_nis')) return 'student_nis';
+    }
+
+    if (cleanParsed === 'jeniskelamin' || cleanParsed === 'jk' || cleanParsed === 'gender' || cleanParsed === 'sex') {
+      if (expectedHeaders.includes('jeniskelamin')) return 'jeniskelamin';
+    }
+
+    return parsedStr.toLowerCase();
+  }
+
+  // Robust Student struct Normalizer
+  normalizeStudent(raw: any): Student | null {
+    if (!raw) return null;
+    
+    const findValue = (keys: string[]): any => {
+      for (const k of Object.keys(raw)) {
+        const cleanedK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (keys.map(key => key.toLowerCase().replace(/[^a-z0-9]/g, '')).includes(cleanedK)) {
+          return raw[k];
+        }
+      }
+      return undefined;
+    };
+
+    const id = findValue(['id', 'uuid', 'studentid', 'student_id']) || raw.id || '';
+    const nis = String(findValue(['nis', 'nisn', 'nomorinduk', 'studentnis', 'student_nis']) || raw.nis || '').trim();
+    const namalengkap = String(findValue(['namalengkap', 'nama', 'fullname', 'studentname', 'student_name', 'namasiswa', 'nama_siswa']) || raw.namalengkap || '').trim();
+    const kelas = String(findValue(['kelas', 'class', 'studentclass', 'student_class', 'grade']) || raw.kelas || '').trim();
+    const jeniskelamin = String(findValue(['jeniskelamin', 'jk', 'gender', 'sex']) || raw.jeniskelamin || '-').trim();
+
+    if (!nis && !namalengkap) return null;
+
+    return {
+      id: id || `student_${nis || Math.random().toString(36).substr(2, 9)}`,
+      nis,
+      namalengkap,
+      kelas,
+      jeniskelamin
+    };
+  }
+
   // SPREADSHEET ID CONFIGURATION
   async getSpreadsheetId(): Promise<string | null> {
     return localStorage.getItem('google_spreadsheet_id') || import.meta.env.VITE_GOOGLE_SPREADSHEET_ID || '1G_iMlKROJmq0UPb1Angg4IphW7BxVcron8yBEla7p2c';
@@ -394,7 +463,10 @@ class DatabaseService {
                         cellVal = JSON.parse(cellVal);
                       } catch (_) {}
                     }
-                    obj[header] = cellVal;
+                    const canonicalKey = this.getCanonicalHeader(header, cfg.headers);
+                    if (canonicalKey) {
+                      obj[canonicalKey] = cellVal;
+                    }
                   });
                   items.push(obj);
                 }
@@ -445,7 +517,10 @@ class DatabaseService {
                     cellVal = JSON.parse(cellVal);
                   } catch (_) {}
                 }
-                obj[header] = cellVal;
+                const canonicalKey = this.getCanonicalHeader(header, cfg.headers);
+                if (canonicalKey) {
+                  obj[canonicalKey] = cellVal;
+                }
               });
               
               items.push(obj);
@@ -491,7 +566,10 @@ class DatabaseService {
                               val = JSON.parse(val);
                             } catch (_) {}
                           }
-                          obj[key] = val;
+                          const canonicalKey = this.getCanonicalHeader(key, cfg.headers);
+                          if (canonicalKey) {
+                            obj[canonicalKey] = val;
+                          }
                         }
                       });
                     }
@@ -723,50 +801,81 @@ class DatabaseService {
   }
 
   // --- STUDENT FUNCTIONS ---
-  async getStudentByNIS(nis: string): Promise<Student | null> {
-    const list = this.getLocalTable<Student>('data_siswa');
-    const match = list.find(s => s.nis === nis);
-    return match || null;
+  async getStudentByNIS(nis: string | number): Promise<Student | null> {
+    if (nis === undefined || nis === null) return null;
+    const cleanNis = nis.toString().trim().toLowerCase();
+    if (!cleanNis) return null;
+
+    const list = this.getLocalTable<any>('data_siswa');
+    for (const item of list) {
+      const normalized = this.normalizeStudent(item);
+      if (normalized) {
+        if (normalized.nis.toLowerCase() === cleanNis) {
+          return normalized;
+        }
+      }
+    }
+    return null;
   }
 
-  async getStudentByNISN(nis: string): Promise<Student | null> {
+  async getStudentByNISN(nis: string | number): Promise<Student | null> {
     return this.getStudentByNIS(nis);
   }
 
   async getStudentsByKelas(kelas: string): Promise<Student[]> {
-    const list = this.getLocalTable<Student>('data_siswa');
-    const filtered = list.filter(s => s.kelas === kelas);
-    return filtered.sort((a, b) => a.namalengkap.localeCompare(b.namalengkap));
+    const list = this.getLocalTable<any>('data_siswa');
+    const result: Student[] = [];
+    for (const item of list) {
+      const normalized = this.normalizeStudent(item);
+      if (normalized && normalized.kelas.toLowerCase() === kelas.toLowerCase()) {
+        result.push(normalized);
+      }
+    }
+    return result.sort((a, b) => a.namalengkap.localeCompare(b.namalengkap));
   }
 
   async getStudentsByGrade(grade: string): Promise<Student[]> {
-    const list = this.getLocalTable<Student>('data_siswa');
-    return list.filter(s => s.kelas && s.kelas.startsWith(`${grade}.`));
+    const list = this.getLocalTable<any>('data_siswa');
+    const result: Student[] = [];
+    for (const item of list) {
+      const normalized = this.normalizeStudent(item);
+      if (normalized && normalized.kelas && normalized.kelas.startsWith(`${grade}.`)) {
+        result.push(normalized);
+      }
+    }
+    return result;
   }
 
   async getAvailableKelas(grade?: string): Promise<string[]> {
-    const list = this.getLocalTable<Student>('data_siswa');
-    let filtered = list;
-    if (grade) {
-      filtered = list.filter(s => s.kelas && s.kelas.startsWith(`${grade}.`));
+    const list = this.getLocalTable<any>('data_siswa');
+    const result: string[] = [];
+    for (const item of list) {
+      const normalized = this.normalizeStudent(item);
+      if (normalized && normalized.kelas) {
+        if (!grade || normalized.kelas.startsWith(`${grade}.`)) {
+          result.push(normalized.kelas);
+        }
+      }
     }
-    const uniqueKelas = Array.from(new Set<string>(filtered.map(s => s.kelas))).filter(Boolean).sort();
-    return uniqueKelas;
+    return Array.from(new Set<string>(result)).filter(Boolean).sort();
   }
 
   async upsertStudents(students: Student[]): Promise<void> {
-    const list = this.getLocalTable<Student>('data_siswa');
+    const list = this.getLocalTable<any>('data_siswa');
+    const normalizedList = list.map(item => this.normalizeStudent(item)).filter(Boolean) as Student[];
+
     for (const s of students) {
-      const studentId = s.id || s.nis;
-      const cleanStudent = { ...s, id: studentId };
-      const idx = list.findIndex(item => item.id === studentId || item.nis === s.nis);
+      const cleanS = this.normalizeStudent(s);
+      if (!cleanS) continue;
+      
+      const idx = normalizedList.findIndex(item => item.id === cleanS.id || item.nis === cleanS.nis);
       if (idx > -1) {
-        list[idx] = cleanStudent;
+        normalizedList[idx] = cleanS;
       } else {
-        list.push(cleanStudent);
+        normalizedList.push(cleanS);
       }
     }
-    this.setLocalTable('data_siswa', list);
+    this.setLocalTable('data_siswa', normalizedList);
   }
 
   // --- GRADE FUNCTIONS ---
