@@ -371,83 +371,147 @@ class DatabaseService {
     this.isSyncingFromSheets = true;
     try {
       const appsScriptUrl = await this.getAppsScriptUrl();
-    if (appsScriptUrl) {
-      for (const cfg of TABS_CONFIG) {
-        try {
-          const res = await fetch(`${appsScriptUrl}?sheet=${encodeURIComponent(cfg.name)}`, { method: 'GET' });
-          if (res.ok) {
-            const json = await res.json();
-            const rows: any[][] = json.values || [];
-            if (rows.length > 1) {
-              const headers = rows[0];
-              const items: any[] = [];
-              for (let i = 1; i < rows.length; i++) {
-                const row = rows[i];
-                if (row.length === 0 || !row[0]) continue;
-                const obj: any = {};
-                headers.forEach((header, colIdx) => {
-                  let cellVal = row[colIdx];
-                  if (cellVal === undefined || cellVal === null) cellVal = '';
-                  
-                  if (typeof cellVal === 'string' && (cellVal.startsWith('[') || cellVal.startsWith('{'))) {
-                    try {
-                      cellVal = JSON.parse(cellVal);
-                    } catch (_) {}
-                  }
-                  obj[header] = cellVal;
-                });
-                items.push(obj);
-              }
-              if (items.length > 0) {
-                this.setLocalTable(cfg.name, items);
+      if (appsScriptUrl) {
+        for (const cfg of TABS_CONFIG) {
+          try {
+            const res = await fetch(`${appsScriptUrl}?sheet=${encodeURIComponent(cfg.name)}`, { method: 'GET' });
+            if (res.ok) {
+              const json = await res.json();
+              const rows: any[][] = json.values || [];
+              if (rows.length > 1) {
+                const headers = rows[0];
+                const items: any[] = [];
+                for (let i = 1; i < rows.length; i++) {
+                  const row = rows[i];
+                  if (row.length === 0 || !row[0]) continue;
+                  const obj: any = {};
+                  headers.forEach((header, colIdx) => {
+                    let cellVal = row[colIdx];
+                    if (cellVal === undefined || cellVal === null) cellVal = '';
+                    
+                    if (typeof cellVal === 'string' && (cellVal.startsWith('[') || cellVal.startsWith('{'))) {
+                      try {
+                        cellVal = JSON.parse(cellVal);
+                      } catch (_) {}
+                    }
+                    obj[header] = cellVal;
+                  });
+                  items.push(obj);
+                }
+                if (items.length > 0) {
+                  this.setLocalTable(cfg.name, items);
+                }
               }
             }
+          } catch (e) {
+            console.warn(`Gagal menarik data ${cfg.name} via Apps Script:`, e);
           }
-        } catch (e) {
-          console.warn(`Gagal menarik data ${cfg.name} via Apps Script:`, e);
+        }
+        return;
+      }
+
+      const token = accessToken || localStorage.getItem('google_oauth_token') || '';
+      const spreadsheetId = await this.getSpreadsheetId();
+      if (!spreadsheetId) {
+        throw new Error("Spreadsheet ID belum terkonfigurasi!");
+      }
+
+      let fetchedViaREST = false;
+
+      // Coba lewat REST API jika token tersedia
+      if (token) {
+        try {
+          await this.initializeExistingSpreadsheet(spreadsheetId, token);
+
+          for (const cfg of TABS_CONFIG) {
+            const res = await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z5000`, { method: 'GET' }, token);
+            const rows: any[][] = res.values || [];
+            if (rows.length <= 1) continue;
+            
+            const headers = rows[0];
+            const items: any[] = [];
+            
+            for (let i = 1; i < rows.length; i++) {
+              const row = rows[i];
+              if (row.length === 0 || !row[0]) continue;
+              
+              const obj: any = {};
+              headers.forEach((header, colIdx) => {
+                let cellVal = row[colIdx];
+                if (cellVal === undefined || cellVal === null) cellVal = '';
+                
+                if (typeof cellVal === 'string' && (cellVal.startsWith('[') || cellVal.startsWith('{'))) {
+                  try {
+                    cellVal = JSON.parse(cellVal);
+                  } catch (_) {}
+                }
+                obj[header] = cellVal;
+              });
+              
+              items.push(obj);
+            }
+
+            this.setLocalTable(cfg.name, items);
+          }
+          fetchedViaREST = true;
+          console.log("Berhasil menyinkronkan seluruh tabel dari Google Sheets melalui REST API.");
+        } catch (errREST) {
+          console.warn("Gagal menarik data via REST API, mencoba dengan GViz Public fallback:", errREST);
         }
       }
-      return;
-    }
 
-    const token = accessToken || localStorage.getItem('google_oauth_token') || '';
-    const spreadsheetId = await this.getSpreadsheetId();
-    if (!spreadsheetId) {
-      throw new Error("Spreadsheet ID belum terkonfigurasi!");
-    }
+      // Fallback ke GViz Public REST API jika belum berhasil ditarik via REST API atau tidak memiliki token
+      if (!fetchedViaREST) {
+        console.log("Menarik data database spreadsheet menggunakan Google Visualization API (Public Fallback)...");
+        for (const cfg of TABS_CONFIG) {
+          try {
+            const publicRes = await fetch(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(cfg.name)}`);
+            if (publicRes.ok) {
+              const txt = await publicRes.text();
+              const match = txt.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/);
+              if (match) {
+                const json = JSON.parse(match[1]);
+                if (json.table && json.table.rows) {
+                  const cols = json.table.cols || [];
+                  const headers = cols.map((c: any) => c.label || '').filter(Boolean);
+                  const activeHeaders = headers.length > 0 ? headers : cfg.headers;
 
-    await this.initializeExistingSpreadsheet(spreadsheetId, token);
+                  const items: any[] = [];
+                  json.table.rows.forEach((row: any) => {
+                    const obj: any = {};
+                    if (row.c) {
+                      row.c.forEach((cell: any, idx: number) => {
+                        const key = activeHeaders[idx];
+                        if (key) {
+                          let val = cell ? cell.v : null;
+                          if (val === null || val === undefined) val = '';
+                          
+                          if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
+                            try {
+                              val = JSON.parse(val);
+                            } catch (_) {}
+                          }
+                          obj[key] = val;
+                        }
+                      });
+                    }
+                    // Filter row-row kosong
+                    if (Object.keys(obj).length > 0 && (obj.id || obj.nis || obj.nisn || obj.title)) {
+                      items.push(obj);
+                    }
+                  });
 
-    for (const cfg of TABS_CONFIG) {
-      const res = await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z5000`, { method: 'GET' }, token);
-      const rows: any[][] = res.values || [];
-      if (rows.length <= 1) continue;
-      
-      const headers = rows[0];
-      const items: any[] = [];
-      
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (row.length === 0 || !row[0]) continue;
-        
-        const obj: any = {};
-        headers.forEach((header, colIdx) => {
-          let cellVal = row[colIdx];
-          if (cellVal === undefined || cellVal === null) cellVal = '';
-          
-          if (typeof cellVal === 'string' && (cellVal.startsWith('[') || cellVal.startsWith('{'))) {
-            try {
-              cellVal = JSON.parse(cellVal);
-            } catch (_) {}
+                  if (items.length > 0) {
+                    this.setLocalTable(cfg.name, items);
+                  }
+                }
+              }
+            }
+          } catch (ePublic) {
+            console.warn(`Gagal menarik data ${cfg.name} via GViz Public fallback:`, ePublic);
           }
-          obj[header] = cellVal;
-        });
-        
-        items.push(obj);
+        }
       }
-
-      this.setLocalTable(cfg.name, items);
-    }
     } finally {
       this.isSyncingFromSheets = false;
     }

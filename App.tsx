@@ -17,6 +17,7 @@ import TeacherTaskCheck from './pages/TeacherTaskCheck';
 import TeacherAdminManagement from './pages/TeacherAdminManagement';
 import TeacherExams from './pages/TeacherExams';
 import TeacherExamEditor from './pages/TeacherExamEditor';
+import { db } from './services/supabaseMock';
 
 // Higher Order Component for Route Protection
 // Fix: Use React.FC and make children optional to resolve the "Property 'children' is missing" JSX error
@@ -48,6 +49,13 @@ const ScrollToTop = () => {
 };
 
 const App: React.FC = () => {
+  useEffect(() => {
+    // Jalankan sinkronisasi background saat aplikasi dibuka oleh siapa saja (Siswa maupun Guru)
+    db.syncFromGoogleSheets().catch(err => {
+      console.warn("Gagal menyinkronkan data Google Sheets pada startup:", err);
+    });
+  }, []);
+
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ScrollToTop />
