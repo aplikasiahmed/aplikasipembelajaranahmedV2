@@ -54,7 +54,7 @@ class DatabaseService {
 
   // SPREADSHEET ID CONFIGURATION
   async getSpreadsheetId(): Promise<string | null> {
-    return localStorage.getItem('google_spreadsheet_id') || '1G_iMlKROJmq0UPb1Angg4IphW7BxVcron8yBEla7p2c';
+    return localStorage.getItem('google_spreadsheet_id') || import.meta.env.VITE_GOOGLE_SPREADSHEET_ID || '1G_iMlKROJmq0UPb1Angg4IphW7BxVcron8yBEla7p2c';
   }
 
   async setSpreadsheetId(id: string | null): Promise<void> {
@@ -66,7 +66,7 @@ class DatabaseService {
   }
 
   async getAppsScriptUrl(): Promise<string | null> {
-    return localStorage.getItem('google_apps_script_url') || null;
+    return localStorage.getItem('google_apps_script_url') || import.meta.env.VITE_GOOGLE_APPS_SCRIPT_URL || null;
   }
 
   async setAppsScriptUrl(url: string | null): Promise<void> {
@@ -801,6 +801,15 @@ class DatabaseService {
   async resetMaterials(): Promise<void> {
     this.setLocalTable('materi_belajar', []);
   }
+  async resetExams(): Promise<void> {
+    this.setLocalTable('ujian', []);
+  }
+  async resetQuestions(): Promise<void> {
+    this.setLocalTable('bank_soal', []);
+  }
+  async resetExamResults(): Promise<void> {
+    this.setLocalTable('hasil_ujian', []);
+  }
   async resetAllData(): Promise<void> {
     await Promise.all([
       this.resetAttendance(),
@@ -808,9 +817,9 @@ class DatabaseService {
       this.resetTasks(),
       this.resetStudents(),
       this.resetMaterials(),
-      this.setLocalTable('ujian', []),
-      this.setLocalTable('bank_soal', []),
-      this.setLocalTable('hasil_ujian', [])
+      this.resetExams(),
+      this.resetQuestions(),
+      this.resetExamResults()
     ]);
   }
 

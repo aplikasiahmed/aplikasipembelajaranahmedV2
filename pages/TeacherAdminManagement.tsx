@@ -59,11 +59,11 @@ const TeacherAdminManagement: React.FC = () => {
   const [googleUser, setGoogleUser] = useState<GoogleUserInfo | null>(null);
   const [googleToken, setGoogleToken] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string>(() => {
-    return localStorage.getItem('google_oauth_client_id') || '';
+    return localStorage.getItem('google_oauth_client_id') || import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
   });
   const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
   const [appsScriptUrl, setAppsScriptUrl] = useState<string>(() => {
-    return localStorage.getItem('google_apps_script_url') || '';
+    return localStorage.getItem('google_apps_script_url') || import.meta.env.VITE_GOOGLE_APPS_SCRIPT_URL || '';
   });
   const [useAppsScript, setUseAppsScript] = useState<boolean>(() => {
     return !!localStorage.getItem('google_apps_script_url') || true;

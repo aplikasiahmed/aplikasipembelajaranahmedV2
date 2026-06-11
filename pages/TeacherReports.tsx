@@ -612,8 +612,18 @@ const TeacherReports: React.FC = () => {
     generateExcel(template, 'Template_Import_Siswa', 'SISWA');
   };
 
-  const secureReset = async (type: 'absensi' | 'nilai' | 'tugas' | 'siswa' | 'semua') => {
-    const labels = { absensi: 'Absensi', nilai: 'Nilai', tugas: 'Tugas', siswa: 'Data Siswa', semua: 'SEMUA DATABASE' };
+  const secureReset = async (type: 'absensi' | 'nilai' | 'tugas' | 'siswa' | 'materi' | 'ujian' | 'bank_soal' | 'hasil_ujian' | 'semua') => {
+    const labels = { 
+      absensi: 'Absensi', 
+      nilai: 'Nilai', 
+      tugas: 'Tugas', 
+      siswa: 'Data Siswa', 
+      materi: 'Materi Belajar',
+      ujian: 'Ujian',
+      bank_soal: 'Bank Soal',
+      hasil_ujian: 'Hasil Ujian',
+      semua: 'SEMUA DATABASE' 
+    };
     const confirm = await Swal.fire({
       title: 'Hapus Data?',
       text: `Apakah Bapak yakin ingin menghapus ${labels[type]}?`,
@@ -643,6 +653,10 @@ const TeacherReports: React.FC = () => {
         else if (type === 'nilai') await db.resetGrades();
         else if (type === 'tugas') await db.resetTasks();
         else if (type === 'siswa') await db.resetStudents();
+        else if (type === 'materi') await db.resetMaterials();
+        else if (type === 'ujian') await db.resetExams();
+        else if (type === 'bank_soal') await db.resetQuestions();
+        else if (type === 'hasil_ujian') await db.resetExamResults();
         else await db.resetAllData();
         
         Swal.close();
@@ -924,10 +938,14 @@ const TeacherReports: React.FC = () => {
             <p className="text-[8px] font-bold text-red-700 uppercase italic">Membutuhkan Token Keamanan PAI.</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => secureReset('siswa')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Siswa</button>
+            <button onClick={() => secureReset('siswa')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Data Siswa</button>
             <button onClick={() => secureReset('absensi')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Absensi</button>
             <button onClick={() => secureReset('nilai')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Nilai</button>
             <button onClick={() => secureReset('tugas')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Tugas</button>
+            <button onClick={() => secureReset('materi')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Materi Belajar</button>
+            <button onClick={() => secureReset('ujian')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Ujian</button>
+            <button onClick={() => secureReset('bank_soal')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Bank Soal</button>
+            <button onClick={() => secureReset('hasil_ujian')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Hasil Ujian</button>
             <button onClick={() => secureReset('semua')} className="p-3.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase col-span-2 shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
               <Trash2 size={16}/> Hapus Seluruh Data
             </button>
