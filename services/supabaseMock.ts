@@ -87,6 +87,19 @@ class DatabaseService {
       if (expectedHeaders.includes('jeniskelamin')) return 'jeniskelamin';
     }
 
+    // Question mappings:
+    if (['gambar', 'foto', 'image', 'soalgambar', 'soal_gambar', 'linkgambar', 'link_gambar', 'urlgambar', 'url_gambar', 'imageurl', 'image_url'].includes(cleanParsed)) {
+      if (expectedHeaders.includes('image_url')) return 'image_url';
+    }
+
+    if (['correctanswer', 'correct_answer', 'jawabanbenar', 'jawaban_benar', 'jawaban', 'correct', 'correctkey', 'correct_key', 'kunci', 'kuncijawaban', 'kunci_jawaban'].includes(cleanParsed)) {
+      if (expectedHeaders.includes('correct_answer')) return 'correct_answer';
+    }
+
+    if (['options', 'opsi', 'choices', 'pilihan', 'pilihan_jawaban', 'pilihanjawaban', 'option'].includes(cleanParsed)) {
+      if (expectedHeaders.includes('options')) return 'options';
+    }
+
     return parsedStr.toLowerCase();
   }
 
@@ -1102,7 +1115,37 @@ class DatabaseService {
 
   async getQuestionsByExamId(examId: string): Promise<Question[]> {
     const list = this.getLocalTable<Question>('bank_soal');
-    return list.filter(q => q.exam_id === examId);
+    return list.filter(q => q.exam_id === examId).map(q => {
+      const raw = q as any;
+      const id = raw.id || '';
+      const exam_id = raw.exam_id || '';
+      const type = raw.type || 'pg';
+      const text = raw.text || '';
+      
+      // Map multiple Indonesian or general names for image column
+      const image_url = raw.image_url || raw.gambar || raw.foto || raw.image_path || raw.image || '';
+      
+      let options = raw.options;
+      if (typeof options === 'string') {
+        try {
+          options = JSON.parse(options);
+        } catch (_) {
+          options = options.split(',').map((o: string) => o.trim());
+        }
+      }
+      
+      const correct_answer = String(raw.correct_answer || raw.jawaban_benar || raw.jawaban || '0');
+      
+      return {
+        id,
+        exam_id,
+        type,
+        text,
+        image_url,
+        options: Array.isArray(options) ? options : [],
+        correct_answer
+      } as Question;
+    });
   }
 
   async addQuestion(question: Omit<Question, 'id'>): Promise<Question> {
@@ -1146,24 +1189,48 @@ class DatabaseService {
     return list.filter(e => e.status === 'active' && e.grade === grade && String(e.semester) === String(semester));
   }
 
-  async checkStudentExamResult(nis: string, examId: string): Promise<boolean> {
+  async checkStudentExamResult(nis: string | number, examId: string | number): Promise<boolean> {
+    if (nis === undefined || nis === null) return false;
+    const cleanNis = nis.toString().trim().toLowerCase();
+    const cleanExamId = examId.toString().trim().toLowerCase();
+
     const list = this.getLocalTable<ExamResult>('hasil_ujian');
-    return list.some(r => r.student_nis === nis && r.exam_id === examId);
+    return list.some(r => {
+      const rNis = r.student_nis ? r.student_nis.toString().trim().toLowerCase() : '';
+      const rExamId = r.exam_id ? r.exam_id.toString().trim().toLowerCase() : '';
+      return rNis === cleanNis && rExamId === cleanExamId;
+    });
   }
 
   async hasExamResults(examId: string): Promise<boolean> {
     const list = this.getLocalTable<ExamResult>('hasil_ujian');
-    return list.some(r => r.exam_id === examId);
+    const cleanExamId = examId.toString().trim().toLowerCase();
+    return list.some(r => r.exam_id && r.exam_id.toString().trim().toLowerCase() === cleanExamId);
   }
 
   async submitExamResult(result: Omit<ExamResult, 'id' | 'submitted_at'>): Promise<ExamResult> {
+    const list = this.getLocalTable<ExamResult>('hasil_ujian');
+    
+    // Safety check: prevent duplicate submissions of the same exam by the same NIS
+    const cleanNis = result.student_nis.toString().trim().toLowerCase();
+    const cleanExamId = result.exam_id.toString().trim().toLowerCase();
+    const existing = list.find(r => {
+      const rNis = r.student_nis ? r.student_nis.toString().trim().toLowerCase() : '';
+      const rExamId = r.exam_id ? r.exam_id.toString().trim().toLowerCase() : '';
+      return rNis === cleanNis && rExamId === cleanExamId;
+    });
+
+    if (existing) {
+      console.warn("Safety Check: duplicate submission detected for NIS", cleanNis, "and exam", cleanExamId);
+      return existing;
+    }
+
     const id = 'res_' + Math.random().toString(36).substr(2, 9);
     const newResult = {
       ...result,
       id,
       submitted_at: new Date().toISOString()
     } as ExamResult;
-    const list = this.getLocalTable<ExamResult>('hasil_ujian');
     list.push(newResult);
     this.setLocalTable('hasil_ujian', list);
 
