@@ -175,8 +175,12 @@ const PublicExam: React.FC = () => {
       }
 
       // 2. Validasi Kelas Siswa vs Kelas Ujian (PENTING!)
-      const studentGrade = s.kelas ? s.kelas.charAt(0) : ''; 
-      if (studentGrade !== selectedExam.grade) {
+      const studentGradeMatch = s.kelas ? s.kelas.match(/\d+/) : null;
+      const studentGrade = studentGradeMatch ? studentGradeMatch[0] : '';
+      const examGradeMatch = selectedExam.grade ? String(selectedExam.grade).match(/\d+/) : null;
+      const examGrade = examGradeMatch ? examGradeMatch[0] : '';
+
+      if (studentGrade !== examGrade) {
           failLogin(`Soal untuk Kelas ${selectedExam.grade}, Anda Kelas ${s.kelas}.`);
           return;
       }
