@@ -154,7 +154,7 @@ const PublicExam: React.FC = () => {
         return;
     }
     // CEK KECOCOKAN SEMESTER
-    if (loginSemester !== selectedExam.semester) {
+    if (String(loginSemester).trim() !== String(selectedExam.semester).trim()) {
         failLogin(`Soal ini untuk Semester ${selectedExam.semester}, Anda memilih Semester ${loginSemester}.`);
         return;
     }
@@ -186,7 +186,19 @@ const PublicExam: React.FC = () => {
       // 3. Cek Apakah Sudah Mengerjakan
       const hasTaken = await db.checkStudentExamResult(s.nis, selectedExam.id);
       if (hasTaken) {
-          failLogin('Anda sudah mengerjakan soal ini (Hanya 1x).');
+          setLoadingLogin(false);
+          setShowLoginModal(false);
+          setSelectedExam(null);
+          
+          Swal.fire({
+              icon: 'warning',
+              title: 'Peringatan',
+              text: 'Anda sudah mengerjakan Soal ini',
+              confirmButtonText: 'OK',
+              confirmButtonColor: '#059669',
+              heightAuto: false,
+              allowOutsideClick: false
+          });
           return;
       }
 
