@@ -61,6 +61,13 @@
         body {
             font-family: 'Inter', sans-serif;
         }
+        /* Hide Edge & IE default password eye and clear icons so they do not overlap with our custom eye */
+        input::-ms-reveal,
+        input::-ms-clear {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+        }
         .arabic-text {
             font-family: 'Amiri', serif;
         }
