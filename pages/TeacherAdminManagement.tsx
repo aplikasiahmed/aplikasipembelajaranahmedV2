@@ -29,6 +29,7 @@ import { auth, googleProvider } from '../services/firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
 import { AdminUser } from '../types';
 import Swal from 'sweetalert2';
+import { verifySecurityToken } from '../utils/security';
 
 // Interface untuk data profil Google
 interface GoogleUserInfo {
@@ -658,22 +659,7 @@ const TeacherAdminManagement: React.FC = () => {
     if (!confirmResult.isConfirmed) return;
 
     // VALIDASI 2: Token ID Server
-    const { value: token } = await Swal.fire({
-      title: 'Verifikasi Keamanan',
-      text: 'Masukkan Token ID Server',
-      input: 'password',
-      inputPlaceholder: 'Token ID Server',
-      inputAttributes: {
-        autocapitalize: 'off',
-        autocorrect: 'off'
-      },
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      confirmButtonText: 'Verifikasi & Hapus',
-      cancelButtonText: 'Batal',
-      heightAuto: false
-    });
+    const token = await verifySecurityToken('Masukkan Token ID Server', 'Verifikasi Keamanan', '#dc2626', 'Verifikasi & Hapus');
 
     if (token) {
         if (token === "PAI_ADMIN_GURU") {

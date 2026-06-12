@@ -4,6 +4,7 @@ import { FileEdit, Plus, Trash2, Edit, PlayCircle, PauseCircle, Loader2, ArrowLe
 import { db } from '../services/supabaseMock';
 import { Exam, GradeLevel } from '../types';
 import Swal from 'sweetalert2';
+import { verifySecurityToken } from '../utils/security';
 
 const TeacherExams: React.FC = () => {
   const navigate = useNavigate();
@@ -229,16 +230,7 @@ const TeacherExams: React.FC = () => {
     if (!result.isConfirmed) return;
 
     // 3. Validasi Keamanan Token
-    const { value: token } = await Swal.fire({
-      title: 'Verifikasi Keamanan',
-      text: 'Masukkan Token ID Server PAI',
-      input: 'password',
-      inputPlaceholder: 'Token Keamanan',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      heightAuto: false
-    });
+    const token = await verifySecurityToken('Masukkan Token ID Server PAI');
 
     if (token === "PAI_ADMIN_GURU") {
         Swal.fire({ title: 'Memproses....', didOpen: () => Swal.showLoading(), heightAuto: false });

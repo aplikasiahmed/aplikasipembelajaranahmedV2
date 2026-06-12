@@ -23,6 +23,7 @@ import * as XLSX from 'xlsx';
 // Import Utils
 import { generateExcel, generateBatchExcel } from '../utils/excelGenerator';
 import { generatePDFReport, generateBatchPDFReport } from '../utils/pdfGenerator';
+import { verifySecurityToken } from '../utils/security';
 import { formatBulan } from '../utils/format';
 
 const TeacherReports: React.FC = () => {
@@ -635,16 +636,7 @@ const TeacherReports: React.FC = () => {
 
     if (!confirm.isConfirmed) return;
 
-    const { value: token } = await Swal.fire({ 
-      title: 'Verifikasi Keamanan', 
-      text: 'Masukkan Kode Token ID Server:',
-      input: 'password', 
-      inputPlaceholder: 'Kode Token',
-      icon: 'warning', 
-      showCancelButton: true, 
-      confirmButtonColor: '#dc2626',
-      heightAuto: false 
-    });
+    const token = await verifySecurityToken('Masukkan Kode Token ID Server:');
 
     if (token === "PAI_ADMIN_GURU") {
       Swal.fire({ title: 'Menghapus...', didOpen: () => Swal.showLoading(), heightAuto: false });

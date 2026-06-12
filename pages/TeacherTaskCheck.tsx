@@ -4,6 +4,7 @@ import { Search, Filter, ExternalLink, Image as ImageIcon, Link as LinkIcon, Tra
 import { db } from '../services/supabaseMock';
 import { TaskSubmission, GradeLevel } from '../types';
 import Swal from 'sweetalert2';
+import { verifySecurityToken } from '../utils/security';
 
 const TeacherTaskCheck: React.FC = () => {
   const navigate = useNavigate();
@@ -135,16 +136,7 @@ const TeacherTaskCheck: React.FC = () => {
       if (!confirm.isConfirmed) return;
 
       // 2. Layer Keamanan Ganda (Token)
-      const { value: token } = await Swal.fire({
-          title: 'Verifikasi Keamanan',
-          text: 'Masukkan Token ID Server PAI',
-          input: 'password',
-          inputPlaceholder: 'Token Keamanan',
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonColor: '#dc2626',
-          heightAuto: false
-      });
+      const token = await verifySecurityToken('Masukkan Token ID Server PAI');
 
       if (token === "PAI_ADMIN_GURU") {
           Swal.fire({ title: 'Menghapus...', didOpen: () => Swal.showLoading(), heightAuto: false });
@@ -183,16 +175,7 @@ const TeacherTaskCheck: React.FC = () => {
       if (!confirm.isConfirmed) return;
 
       // 2. Layer Keamanan Ganda (Token)
-      const { value: token } = await Swal.fire({
-          title: 'Verifikasi Keamanan',
-          text: 'Masukkan Token ID Server PAI',
-          input: 'password',
-          inputPlaceholder: 'Token Keamanan',
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonColor: '#dc2626',
-          heightAuto: false
-      });
+      const token = await verifySecurityToken('Masukkan Token ID Server PAI');
 
       if (token === "PAI_ADMIN_GURU") {
           Swal.fire({ title: 'Menghapus...', didOpen: () => Swal.showLoading(), heightAuto: false });

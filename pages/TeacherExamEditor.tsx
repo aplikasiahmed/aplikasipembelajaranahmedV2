@@ -5,6 +5,7 @@ import { ArrowLeft, Save, Plus, Trash2, CheckCircle2, AlertCircle, ImageIcon, X,
 import { db } from '../services/supabaseMock';
 import { Exam, Question } from '../types';
 import Swal from 'sweetalert2';
+import { verifySecurityToken } from '../utils/security';
 
 const TeacherExamEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -169,16 +170,7 @@ const TeacherExamEditor: React.FC = () => {
 
     if (!res.isConfirmed) return;
 
-    const { value: token } = await Swal.fire({
-      title: 'Verifikasi Keamanan',
-      text: 'Masukkan Token ID Server PAI',
-      input: 'password',
-      inputPlaceholder: 'Token Keamanan',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      heightAuto: false
-    });
+    const token = await verifySecurityToken('Masukkan Token ID Server PAI');
 
     if (token === "PAI_ADMIN_GURU") {
         await db.deleteQuestion(qid);
