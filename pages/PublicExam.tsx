@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Timer, CheckCircle, ShieldAlert, LogOut, ChevronLeft, ChevronRight, Flag, Grid, User, Calendar, X, ArrowRight, BookOpen, AlertTriangle, Loader2, HelpCircle, AlertOctagon, Clock, LogIn } from 'lucide-react';
+import { Search, Timer, CheckCircle, ShieldAlert, LogOut, ChevronLeft, ChevronRight, Flag, Grid, User, Calendar, X, ArrowRight, BookOpen, AlertTriangle, Loader2, HelpCircle, AlertOctagon, Clock, LogIn, Award } from 'lucide-react';
 import { db } from '../services/supabaseMock';
 import { Student, Exam, Question } from '../types';
 import Swal from 'sweetalert2';
@@ -865,7 +865,21 @@ const PublicExam: React.FC = () => {
            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nilai Kamu</p>
            <p className="text-5xl font-black text-emerald-600 tracking-tighter">{score}</p>
         </div>
-        <button onClick={() => { setStep('public_list'); setNis(''); setSelectedExam(null); }} className="bg-emerald-600 text-white px-8 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-2"><ArrowRight size={16} /> Selesai</button>
+        <div className="flex flex-col sm:flex-row gap-3 w-full">
+          <button 
+            onClick={() => { setStep('public_list'); setNis(''); setSelectedExam(null); }} 
+            className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 px-6 py-4 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            KEMBALI KE DAFTAR SOAL
+          </button>
+          
+          <button 
+            onClick={() => { window.location.hash = '#/nilai'; }} 
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-600/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+          >
+            <Award size={16} /> LIHAT NILAI SAYA
+          </button>
+        </div>
       </div>
     );
   }
