@@ -42,6 +42,60 @@ const TeacherInputGrades: React.FC = () => {
 
   const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
 
+  // Load TPs and Assessments for selected grade & semester
+  const [tps, setTps] = useState<any[]>([]);
+  const [assessments, setAssessments] = useState<any[]>([]);
+  const [selectedTpId, setSelectedTpId] = useState<string>('');
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState<string>('');
+
+  useEffect(() => {
+    const savedTps = localStorage.getItem('pai_grades_tps');
+    const savedAsms = localStorage.getItem('pai_grades_assessments');
+    
+    if (savedTps) {
+      try {
+        const allTps = JSON.parse(savedTps);
+        const filteredTps = allTps.filter((t: any) => t.grade === grade && String(t.semester) === String(semester));
+        const sortedTps = filteredTps.sort((a: any, b: any) => {
+          const codeA = String(a.code || '').toLowerCase();
+          const codeB = String(b.code || '').toLowerCase();
+          return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        setTps(sortedTps);
+        if (filteredTps.length > 0) {
+          setSelectedTpId(filteredTps[0].id);
+        } else {
+          setSelectedTpId('');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      setTps([]);
+      setSelectedTpId('');
+    }
+
+    if (savedAsms) {
+      try {
+        setAssessments(JSON.parse(savedAsms));
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      setAssessments([]);
+    }
+  }, [grade, semester]);
+
+  const currentTpAssessments = assessments.filter((a: any) => a.tpId === selectedTpId);
+
+  useEffect(() => {
+    if (currentTpAssessments.length > 0) {
+      setSelectedAssessmentId(currentTpAssessments[0].id);
+    } else {
+      setSelectedAssessmentId('');
+    }
+  }, [selectedTpId, assessments]);
+
   // Load Kelas berdasarkan Jenjang (Untuk Form Manual)
   // FIX: Tambahkan logika cek prefill agar tidak menimpa kelas yang dikirim
   useEffect(() => {
@@ -142,17 +196,46 @@ const TeacherInputGrades: React.FC = () => {
     e.preventDefault();
     
     // 1. Validasi Kolom Kosong
-    if (!selectedStudentId || !date || !semester || !type || !selectedKelas || score === '' || !desc.trim()) {
+    const isHarian = type === 'Harian' || type === 'Praktik';
+    const validationFailed = 
+      !selectedStudentId || 
+      !date || 
+      !semester || 
+      !type || 
+      !selectedKelas || 
+      score === '' ||
+      (isHarian && !selectedAssessmentId);
+
+    if (validationFailed) {
       Swal.fire({ 
         icon: 'warning', 
         title: 'Perhatian', 
-        text: 'Kolom kosong wajib di isi!', 
+        text: 'Kolom kosong wajib di pilih/isi!', 
         heightAuto: false 
       });
       return;
     }
 
     const selectedStudentName = students.find(s => s.id === selectedStudentId)?.namalengkap || '-';
+    
+    const savedSubjectType = 
+      type === 'PTS' ? 'uts' :
+      type === 'UAS' ? 'uas' :
+      type === 'Praktik' ? 'praktik' : 'harian';
+
+    const currentAsmName = isHarian 
+      ? (assessments.find(a => a.id === selectedAssessmentId)?.name || 'Penilaian') 
+      : (type === 'PTS' ? 'Sumatif Tengah Semester' : 'Sumatif Akhir Semester');
+
+    const savedDescription = isHarian ? selectedAssessmentId : (desc.trim() || currentAsmName);
+
+    const getDropdownLabel = (val: string) => {
+      if (val === 'Harian') return 'Sumatif Harian (Per TP)';
+      if (val === 'PTS') return 'Sumatif Tengah Semester (STS)';
+      if (val === 'UAS') return 'Sumatif Akhir Semester (SAS)';
+      if (val === 'Praktik') return 'Praktik';
+      return val;
+    };
 
     // 2. Konfirmasi Sebelum Kirim
     const result = await Swal.fire({
@@ -163,9 +246,9 @@ const TeacherInputGrades: React.FC = () => {
           <p><strong>Kelas:</strong> ${selectedKelas}</p>
           <p><strong>Semester:</strong> ${semester === '1' ? '1 (Ganjil)' : '2 (Genap)'}</p>
           <hr style="margin: 8px 0; border-top: 1px dashed #cbd5e1;">
-          <p><strong>Jenis Tugas:</strong> <span style="text-transform: capitalize;">${type}</span></p>
+          <p><strong>Jenis Tugas:</strong> <span>${getDropdownLabel(type)}</span></p>
           <p><strong>Nilai:</strong> <span style="color: #059669; font-weight: bold;">${score}</span></p>
-          <p><strong>Materi/Ket:</strong> ${desc || '-'}</p>
+          <p><strong>Materi/Ket:</strong> ${currentAsmName} ${!isHarian && desc.trim() ? `(${desc.trim()})` : ''}</p>
         </div>
         <p style="margin-top: 10px; font-size: 0.8em; color: #64748b;">Pastikan data sudah benar sebelum dikirim.</p>
       `,
@@ -187,9 +270,9 @@ const TeacherInputGrades: React.FC = () => {
     try {
       await db.addGrade({ 
         student_id: selectedStudentId, 
-        subject_type: type as 'Harian' | 'PTS' | 'UAS' | 'praktik', 
+        subject_type: savedSubjectType as 'harian' | 'uts' | 'uas' | 'praktik', 
         score: parseInt(score), 
-        description: desc, 
+        description: savedDescription, 
         kelas: selectedKelas, 
         semester,
         created_at: new Date(date).toISOString() 
@@ -478,15 +561,15 @@ const TeacherInputGrades: React.FC = () => {
             </select>
           </div>
 
-          {/* Baris 3: Tipe, Nilai, Materi */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          {/* Baris 3: Tipe & Nilai */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div className="space-y-1">
               <label className="text-[8px] md:text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Jenis Tugas</label>
               <select className="w-full p-2 rounded-lg border border-slate-200 bg-white text-[9px] md:text-sm font-normal outline-none" value={type} onChange={(e: any) => setType(e.target.value)}>
                 <option value="">-- Pilih Tugas --</option>
-                <option value="Harian">Harian</option>
-                <option value="PTS">PTS/UTS</option>
-                <option value="UAS">PAS/UAS</option>
+                <option value="Harian">Sumatif Harian (Per TP)</option>
+                <option value="PTS">Sumatif Tengah Semester (STS)</option>
+                <option value="UAS">Sumatif Akhir Semester (SAS)</option>
                 <option value="Praktik">Praktik</option>
               </select>
             </div>
@@ -497,7 +580,7 @@ const TeacherInputGrades: React.FC = () => {
                 min="0" 
                 max="100" 
                 placeholder="0"
-                className="w-full p-2 rounded-lg border border-slate-200 bg-white text-[11px] md:text-sm font-black outline-none" 
+                className="w-full p-2 rounded-lg border border-slate-200 bg-white text-[11px] md:text-sm font-black outline-none font-mono" 
                 value={score} 
                 onChange={(e) => {
                   const val = e.target.value;
@@ -512,6 +595,42 @@ const TeacherInputGrades: React.FC = () => {
                 }} 
               />
             </div>
+          </div>
+
+          {/* Dynamic TP & Assessment selects when "Harian" or "Praktik" is chosen */}
+          {(type === 'Harian' || type === 'Praktik') && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-3 bg-amber-50/50 rounded-xl border border-amber-100 border-dashed">
+              <div className="space-y-1">
+                <label className="text-[8px] md:text-xs font-black text-amber-800 uppercase tracking-widest ml-1">Pilih Tujuan Pembelajaran (TP)</label>
+                <select 
+                  className="w-full p-2 rounded-lg border border-amber-200 bg-white text-[9px] md:text-xs font-semibold outline-none text-slate-700"
+                  value={selectedTpId}
+                  onChange={(e) => setSelectedTpId(e.target.value)}
+                >
+                  <option value="">-- Pilih TP --</option>
+                  {tps.map(tp => (
+                    <option key={tp.id} value={tp.id}>{tp.code}: {tp.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[8px] md:text-xs font-black text-amber-800 uppercase tracking-widest ml-1">Pilih Penilaian / Tugas</label>
+                <select 
+                  className="w-full p-2 rounded-lg border border-amber-200 bg-white text-[9px] md:text-xs font-semibold outline-none text-slate-700"
+                  value={selectedAssessmentId}
+                  onChange={(e) => setSelectedAssessmentId(e.target.value)}
+                >
+                  <option value="">-- Pilih Penilaian --</option>
+                  {currentTpAssessments.map(asm => (
+                    <option key={asm.id} value={asm.id}>{asm.name} ({asm.type})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Normal Ket/Materi field if not Harian */}
+          {(type !== 'Harian' && type !== '') && (
             <div className="space-y-1">
               <label className="text-[8px] md:text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Ket / Materi</label>
               <input 
@@ -522,7 +641,7 @@ const TeacherInputGrades: React.FC = () => {
                 onChange={(e) => setDesc(e.target.value)} 
               />
             </div>
-          </div>
+          )}
 
           <button type="submit" disabled={status !== 'idle'} className={`w-full py-3 md:py-4 rounded-xl text-[10px] md:text-sm font-black flex items-center justify-center gap-2 shadow-lg uppercase tracking-widest ${status === 'success' ? 'bg-emerald-500 text-white' : 'bg-emerald-700 text-white hover:bg-emerald-800 disabled:bg-slate-200'}`}>
             {status === 'saving' ? 'Menyimpan...' : status === 'success' ? <><CheckCircle2 size={16} /> Berhasil!</> : <><Save size={16} /> Simpan Nilai</>}

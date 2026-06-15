@@ -16,18 +16,32 @@ const TeacherExams: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
+  const [tps, setTps] = useState<any[]>([]);
+  const [assessments, setAssessments] = useState<any[]>([]);
+
   const [formData, setFormData] = useState({
     title: '',
     grade: '',     // Default kosong untuk "Pilih Kelas"
     category: '',  // Default kosong untuk "Pilih Tugas"
     duration: '60',
     semester: '',   // Default kosong untuk "Pilih Semester"
-    deadline: ''    // New: Batas Waktu
+    deadline: '',   // New: Batas Waktu
+    tp_id: '',
+    assessment_id: ''
   });
 
-  // Load Exams
+  // Load Exams, TPs, and Assessments
   useEffect(() => {
     fetchExams();
+    
+    const savedTps = localStorage.getItem('pai_grades_tps');
+    if (savedTps) {
+      try { setTps(JSON.parse(savedTps)); } catch (e) { console.error(e); }
+    }
+    const savedAsms = localStorage.getItem('pai_grades_assessments');
+    if (savedAsms) {
+      try { setAssessments(JSON.parse(savedAsms)); } catch (e) { console.error(e); }
+    }
   }, []);
 
   const fetchExams = async () => {
@@ -47,7 +61,9 @@ const TeacherExams: React.FC = () => {
         category: '',
         duration: '60',
         semester: '',
-        deadline: ''
+        deadline: '',
+        tp_id: '',
+        assessment_id: ''
       });
       setEditingId(null);
     }
@@ -79,7 +95,9 @@ const TeacherExams: React.FC = () => {
         category: exam.category,
         duration: String(exam.duration),
         semester: exam.semester,
-        deadline: formattedDeadline
+        deadline: formattedDeadline,
+        tp_id: exam.tp_id || '',
+        assessment_id: exam.assessment_id || ''
     });
     setEditingId(exam.id);
     setShowForm(true);
@@ -125,7 +143,9 @@ const TeacherExams: React.FC = () => {
         category: formData.category as any,
         semester: formData.semester,
         duration: parseInt(formData.duration) || 60,
-        deadline: formData.deadline ? new Date(formData.deadline).toISOString() : undefined
+        deadline: formData.deadline ? new Date(formData.deadline).toISOString() : undefined,
+        tp_id: formData.tp_id || undefined,
+        assessment_id: formData.assessment_id || undefined
       };
 
       if (editingId) {
@@ -427,6 +447,62 @@ const TeacherExams: React.FC = () => {
                   </div>
                   <p className="text-[9px] text-slate-400 italic ml-1">*Jika diisi, soal otomatis non-aktif setelah tanggal ini.</p>
                </div>
+
+               {/* Hubungkan ke TP & Nilai Ledger */}
+               {(() => {
+                 const filteredTps = tps.filter(t => String(t.grade) === String(formData.grade) && String(t.semester) === String(formData.semester));
+                 const filteredTpsIds = filteredTps.map(t => t.id);
+                 const filteredAssessments = assessments.filter(a => filteredTpsIds.includes(a.tpId));
+                 
+                 return (
+                   <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-100/80 rounded-xl">
+                     <div className="space-y-1">
+                       <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                         Integrasi TP (Kurikulum)
+                       </label>
+                       <select
+                         name="tp_id"
+                         value={formData.tp_id || ''}
+                         onChange={handleInputChange}
+                         className={`w-full px-3 py-2 rounded-lg border text-[11px] font-normal outline-none focus:bg-white focus:border-emerald-500 transition-all ${
+                           formData.tp_id ? 'bg-white text-slate-800 border-emerald-400 font-bold' : 'bg-white text-slate-400 border-slate-200'
+                         }`}
+                       >
+                         <option value="">-- Tanpa TP --</option>
+                         {filteredTps.map(t => (
+                           <option key={t.id} value={t.id} className="text-slate-800 font-medium">
+                             {t.code} - {(t.name || '').substring(0, 25)}{(t.name || '').length > 25 ? '...' : ''}
+                           </option>
+                         ))}
+                       </select>
+                     </div>
+
+                     <div className="space-y-1">
+                       <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                         Integrasi Ledger (Kelola Nilai)
+                       </label>
+                       <select
+                         name="assessment_id"
+                         value={formData.assessment_id || ''}
+                         onChange={handleInputChange}
+                         className={`w-full px-3 py-2 rounded-lg border text-[11px] font-normal outline-none focus:bg-white focus:border-emerald-500 transition-all ${
+                           formData.assessment_id ? 'bg-white text-slate-800 border-emerald-500 font-bold' : 'bg-white text-slate-400 border-slate-200'
+                         }`}
+                       >
+                         <option value="">-- Hubungkan --</option>
+                         {filteredAssessments.map(asm => {
+                           const relatedTp = filteredTps.find(t => t.id === asm.tpId);
+                           return (
+                             <option key={asm.id} value={asm.id} className="text-slate-800 font-medium font-mono text-[10px]">
+                               {relatedTp?.code || 'TP'}: {asm.name.substring(0, 20)}
+                             </option>
+                           );
+                         })}
+                       </select>
+                     </div>
+                   </div>
+                 );
+               })()}
 
                <div className="pt-2">
                   <button 

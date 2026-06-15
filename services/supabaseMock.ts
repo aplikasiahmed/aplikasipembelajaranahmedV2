@@ -13,9 +13,10 @@ const TABS_CONFIG: SheetConfig[] = [
   { name: 'kehadiran', headers: ['id', 'student_id', 'nama_siswa', 'nis', 'kelas', 'date', 'status', 'semester'] },
   { name: 'data_TugasSiswa', headers: ['id', 'nisn', 'student_name', 'kelas', 'task_name', 'submission_type', 'content', 'created_at'] },
   { name: 'materi_belajar', headers: ['id', 'title', 'description', 'grade', 'category', 'content_url', 'thumbnail'] },
-  { name: 'ujian', headers: ['id', 'title', 'grade', 'category', 'semester', 'duration', 'deadline', 'is_random', 'status', 'created_at'] },
+  { name: 'ujian', headers: ['id', 'title', 'grade', 'category', 'semester', 'duration', 'deadline', 'is_random', 'status', 'created_at', 'tp_id', 'assessment_id'] },
   { name: 'bank_soal', headers: ['id', 'exam_id', 'type', 'text', 'image_url', 'options', 'correct_answer'] },
-  { name: 'hasil_ujian', headers: ['id', 'exam_id', 'student_nis', 'student_name', 'student_class', 'semester', 'answers', 'score', 'violation_count', 'started_at', 'submitted_at'] }
+  { name: 'hasil_ujian', headers: ['id', 'exam_id', 'student_nis', 'student_name', 'student_class', 'semester', 'answers', 'score', 'violation_count', 'started_at', 'submitted_at'] },
+  { name: 'kelola_nilai', headers: ['id', 'student_id', 'nama_siswa', 'nis', 'kelas', 'semester', 'sts', 'sas', 'sakit', 'izin', 'alpha', 'sikap', 'katrol', 'nilai_akhir', 'updated_at'] }
 ];
 
 class DatabaseService {
@@ -893,14 +894,31 @@ class DatabaseService {
 
   // --- GRADE FUNCTIONS ---
   async addGrade(grade: Partial<GradeRecord>): Promise<void> {
-    const id = grade.id || 'grade_' + Math.random().toString(36).substr(2, 9);
-    const cleanGrade = {
-      ...grade,
-      id,
-      created_at: grade.created_at || new Date().toISOString()
-    } as GradeRecord;
     const list = this.getLocalTable<GradeRecord>('Nilai');
-    list.push(cleanGrade);
+    
+    // Check if an existing grade record for this student, description, kelas and semester exists, and update it
+    const existingIdx = list.findIndex(g => 
+      g.student_id === grade.student_id && 
+      g.description === grade.description && 
+      g.kelas === grade.kelas && 
+      g.semester === grade.semester
+    );
+
+    if (existingIdx !== -1) {
+      list[existingIdx] = {
+        ...list[existingIdx],
+        ...grade,
+        created_at: grade.created_at || list[existingIdx].created_at || new Date().toISOString()
+      };
+    } else {
+      const id = grade.id || 'grade_' + Math.random().toString(36).substr(2, 9);
+      const cleanGrade = {
+        ...grade,
+        id,
+        created_at: grade.created_at || new Date().toISOString()
+      } as GradeRecord;
+      list.push(cleanGrade);
+    }
     this.setLocalTable('Nilai', list);
   }
 
@@ -916,11 +934,11 @@ class DatabaseService {
     if (semester) {
       const s = semester.toLowerCase();
       if (s === '1' || s === 'ganjil') {
-        filtered = filtered.filter((g: any) => ['1', 'ganjil', 'semester 1'].includes(g.semester.toLowerCase()));
+        filtered = filtered.filter((g: any) => ['1', 'ganjil', 'semester 1'].includes(String(g.semester || '').toLowerCase()));
       } else if (s === '2' || s === 'genap') {
-        filtered = filtered.filter((g: any) => ['2', 'genap', 'semester 2'].includes(g.semester.toLowerCase()));
+        filtered = filtered.filter((g: any) => ['2', 'genap', 'semester 2'].includes(String(g.semester || '').toLowerCase()));
       } else {
-        filtered = filtered.filter((g: any) => g.semester.toLowerCase() === s);
+        filtered = filtered.filter((g: any) => String(g.semester || '').toLowerCase() === s);
       }
     }
 
@@ -969,6 +987,26 @@ class DatabaseService {
       ...a,
       data_siswa: { namalengkap: a.nama_siswa, nis: a.nis }
     }));
+  }
+
+  // --- KELOLA NILAI FUNCTIONS ---
+  async getKelolaNilai(): Promise<any[]> {
+    return this.getLocalTable<any>('kelola_nilai');
+  }
+
+  async saveKelolaNilai(records: any[]): Promise<void> {
+    const list = this.getLocalTable<any>('kelola_nilai');
+    
+    for (const record of records) {
+      const idx = list.findIndex(item => item.id === record.id);
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...record, updated_at: new Date().toISOString() };
+      } else {
+        list.push({ ...record, updated_at: new Date().toISOString() });
+      }
+    }
+    
+    this.setLocalTable('kelola_nilai', list);
   }
 
   // --- RESET FUNCTIONS ---
@@ -1243,7 +1281,7 @@ class DatabaseService {
           student_id: student.id!,
           subject_type: exam.category,
           score: result.score,
-          description: `${exam.title}`,
+          description: exam.assessment_id || exam.title,
           kelas: result.student_class,
           semester: exam.semester,
           created_at: new Date().toISOString()

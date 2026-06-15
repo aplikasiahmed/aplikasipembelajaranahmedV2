@@ -13,7 +13,8 @@ import {
   PencilLine,
   LayoutDashboard,
   FileSearch,
-  Users
+  Users,
+  Scroll
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 import TeacherLogin from '../pages/TeacherLogin';
@@ -87,6 +88,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const teacherLinks = [
     { name: 'Dashboard', path: '/guru', icon: LayoutDashboard },
     { name: 'Input Nilai', path: '/guru/nilai', icon: Award },
+    { name: 'Kelola Nilai', path: '/guru/kelola-nilai', icon: Scroll },
     { name: 'Input Absensi', path: '/guru/absensi', icon: ClipboardCheck },
     { name: 'Cek Tugas Siswa', path: '/guru/tugas-masuk', icon: FileSearch },
     { name: 'Bank Soal', path: '/guru/ujian', icon: FileEdit }, // Menu Baru

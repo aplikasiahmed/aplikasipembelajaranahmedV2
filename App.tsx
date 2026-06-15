@@ -11,6 +11,7 @@ import PublicMaterials from './pages/PublicMaterials';
 import PublicExam from './pages/PublicExam';
 import TeacherDashboard from './pages/TeacherDashboard';
 import TeacherInputGrades from './pages/TeacherInputGrades';
+import TeacherManageGrades from './pages/TeacherManageGrades';
 import TeacherInputAbsensi from './pages/TeacherInputAbsensi';
 import TeacherReports from './pages/TeacherReports';
 import TeacherTaskCheck from './pages/TeacherTaskCheck';
@@ -92,6 +93,11 @@ const App: React.FC = () => {
           <Route path="/guru/nilai" element={
             <ProtectedRoute>
               <TeacherInputGrades />
+            </ProtectedRoute>
+          } />
+          <Route path="/guru/kelola-nilai" element={
+            <ProtectedRoute>
+              <TeacherManageGrades />
             </ProtectedRoute>
           } />
           <Route path="/guru/absensi" element={

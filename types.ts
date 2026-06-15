@@ -66,13 +66,15 @@ export interface Exam {
   id: string;
   title: string;
   grade: GradeLevel;
-  category: 'harian' | 'uts' | 'uas' | 'praktik'; // Added category
+  category: string; // Dynamic category/type
   semester: string;
   duration: number; // in minutes
   deadline?: string; // New: Batas Akhir Pengerjaan (ISO Date String)
   is_random?: boolean; // New: Acak Soal
   status: 'draft' | 'active' | 'closed';
   created_at: string;
+  tp_id?: string; // Linked TP ID
+  assessment_id?: string; // Linked Assessment ID
 }
 
 export interface Question {

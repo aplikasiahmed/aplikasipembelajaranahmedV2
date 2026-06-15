@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
   Award, 
+  Scroll,
   ClipboardCheck, 
   FileText, 
   ShieldCheck, 
@@ -44,6 +45,7 @@ const TeacherDashboard: React.FC = () => {
 
   const menuItems = [
     { title: 'Input Nilai', path: '/guru/nilai', icon: Award, color: 'bg-emerald-600', text: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Kelola nilai harian & ujian' },
+    { title: 'Kelola Nilai', path: '/guru/kelola-nilai', icon: Scroll, color: 'bg-emerald-800', text: 'text-emerald-800', bg: 'bg-emerald-50 border border-emerald-100', desc: 'Rekap TP, STS, SAS & Raport akhir' },
     { title: 'Input Absensi', path: '/guru/absensi', icon: ClipboardCheck, color: 'bg-amber-600', text: 'text-amber-600', bg: 'bg-amber-50', desc: 'Rekap kehadiran harian' },
     { title: 'Cek Tugas', path: '/guru/tugas-masuk', icon: FileText, color: 'bg-purple-600', text: 'text-purple-600', bg: 'bg-purple-50', desc: 'Koreksi tugas & ujian' },
     { title: 'Bank Soal', path: '/guru/ujian', icon: FileEdit, color: 'bg-pink-600', text: 'text-pink-600', bg: 'bg-pink-50', desc: 'Buat & Kelola Soal Ujian' },
