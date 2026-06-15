@@ -176,6 +176,22 @@ const TeacherExams: React.FC = () => {
   const toggleRandom = async (exam: Exam) => {
     const newRandom = !exam.is_random;
     
+    if (newRandom) {
+      const confirmResult = await Swal.fire({
+        title: 'Konfirmasi',
+        text: 'Yakin Semua soal akan di acak , ??',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'IYA',
+        cancelButtonText: 'TIDAK',
+        heightAuto: false
+      });
+      
+      if (!confirmResult.isConfirmed) return;
+    }
+    
     try {
         await db.updateExam(exam.id, { is_random: newRandom });
         
