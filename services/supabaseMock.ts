@@ -920,6 +920,181 @@ class DatabaseService {
       list.push(cleanGrade);
     }
     this.setLocalTable('Nilai', list);
+
+    // Real-time integration: recalculate and save corresponding kelola_nilai record automatically!
+    if (grade.student_id && grade.semester && grade.kelas) {
+      await this.recalculateAndSaveKelolaNilaiForStudent(grade.student_id, String(grade.semester), String(grade.kelas));
+    }
+  }
+
+  async recalculateAndSaveKelolaNilaiForStudent(studentId: string, semester: string, kelas: string): Promise<void> {
+    if (!studentId || !semester || !kelas) return;
+    try {
+      const studentList = this.getLocalTable<any>('data_siswa');
+      const student = studentList.find(s => s.id === studentId);
+      const studentGradeLevel = kelas.trim().charAt(0) || '7';
+
+      // 1. Fetch student's grades for this class and semester
+      const gradesList = this.getLocalTable<GradeRecord>('Nilai');
+      const studentGrades = gradesList.filter(g => 
+        g.student_id === studentId && 
+        String(g.semester) === String(semester) && 
+        g.kelas === kelas
+      );
+
+      // 2. Fetch TPs, Assessments, and Weights
+      const savedTps = localStorage.getItem('pai_grades_tps');
+      const savedAsms = localStorage.getItem('pai_grades_assessments');
+      const savedWeights = localStorage.getItem('pai_grade_weights');
+
+      const tps = savedTps ? JSON.parse(savedTps) : [];
+      const assessments = savedAsms ? JSON.parse(savedAsms) : [];
+      const weights = savedWeights ? JSON.parse(savedWeights) : { harian: 35, sts: 20, sas: 20, kehadiran: 10, sikap: 15 };
+
+      // Filter active TPs for this grade & semester and sort starting from TP 1
+      const currentClassTps = tps
+        .filter((t: any) => t.grade === studentGradeLevel && String(t.semester) === String(semester))
+        .sort((a: any, b: any) => {
+          const codeA = String(a.code || '').toLowerCase();
+          const codeB = String(b.code || '').toLowerCase();
+          return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+      // 3. Map student's grades into assessment scores
+      const tpScores: Record<string, number> = {};
+      let studentSts: number | '' = '';
+      let studentSas: number | '' = '';
+
+      studentGrades.forEach(g => {
+        const typeLower = String(g.subject_type).toLowerCase().trim();
+        if (typeLower === 'uts' || typeLower === 'pts') {
+          studentSts = g.score;
+        } else if (typeLower === 'uas' || typeLower === 'pas') {
+          studentSas = g.score;
+        } else {
+          if (g.description) {
+            tpScores[g.description] = g.score;
+          }
+        }
+      });
+
+      // 4. Calculate TP scores & Nilai Harian Avg
+      let sumHarian = 0;
+      let countHarian = 0;
+
+      currentClassTps.forEach((tp: any) => {
+        // Find assessments tied to this TP
+        const tpAsms = assessments.filter((a: any) => String(a.tpId) === String(tp.id));
+        if (tpAsms.length > 0) {
+          let sumAsm = 0;
+          let countAsm = 0;
+          tpAsms.forEach((asm: any) => {
+            const val = tpScores[asm.id];
+            if (val !== undefined && val !== null && val !== '') {
+              sumAsm += Number(val);
+              countAsm++;
+            }
+          });
+          if (countAsm > 0) {
+            sumHarian += sumAsm / countAsm;
+            countHarian++;
+          }
+        }
+      });
+
+      const harianAvg = countHarian > 0 ? parseFloat((sumHarian / countHarian).toFixed(1)) : null;
+
+      // 5. Fetch existing kelola_nilai record to hold attitudes, katrol etc.
+      const kelolaList = this.getLocalTable<any>('kelola_nilai');
+      const overallKey = `${studentId}_${semester}`;
+      const existingKelola = kelolaList.find(x => x.id === overallKey) || {};
+
+      // 6. Compute attendance counts from kehadiran table
+      const attRecords = this.getLocalTable<any>('kehadiran').filter(att => 
+        att.student_id === studentId && 
+        String(att.semester) === String(semester)
+      );
+
+      let sakit = 0, izin = 0, alpha = 0;
+      if (attRecords.length > 0) {
+        attRecords.forEach(att => {
+          if (att.status === 'sakit') sakit++;
+          else if (att.status === 'izin') izin++;
+          else if (att.status === 'alfa' || att.status === 'alpha') alpha++;
+        });
+      } else {
+        sakit = existingKelola.sakit || 0;
+        izin = existingKelola.izin || 0;
+        alpha = existingKelola.alpha || 0;
+      }
+
+      const getAttendanceScore = (sk: number, iz: number, al: number): number => {
+        const deduction = (sk * 1) + (iz * 2) + (al * 5);
+        return Math.max(0, 100 - deduction);
+      };
+      const kehadiranScore = getAttendanceScore(sakit, izin, alpha);
+
+      // Attitude
+      const sikapStr = existingKelola.sikap || '';
+      const getAttitudeScore = (s: string, nh: number | null): number => {
+        if (s === 'Sangat Baik') return 95;
+        if (s === 'Baik') return 85;
+        if (s === 'Cukup') return 75;
+        if (s === 'Perlu Bimbingan') return 60;
+        return nh !== null ? Math.round(nh) : 85;
+      };
+      const sikapScore = getAttitudeScore(sikapStr, harianAvg);
+
+      const katrol = existingKelola.katrol !== undefined && existingKelola.katrol !== '' ? Number(existingKelola.katrol) : 0;
+
+      // 7. Calculate Nilai Akhir
+      let finalScore: number | '' = '';
+      if (harianAvg !== null) {
+        const wHarian = (weights.harian ?? 35) / 100;
+        const wSts = (weights.sts ?? 20) / 100;
+        const wSas = (weights.sas ?? 20) / 100;
+        const wKehadiran = (weights.kehadiran ?? 10) / 100;
+        const wSikap = (weights.sikap ?? 15) / 100;
+
+        const result = 
+          (harianAvg * wHarian) + 
+          ((studentSts !== '' ? studentSts : 0) * wSts) + 
+          ((studentSas !== '' ? studentSas : 0) * wSas) + 
+          (kehadiranScore * wKehadiran) + 
+          (sikapScore * wSikap);
+
+        finalScore = Math.min(100, Math.max(0, Math.round(result) + katrol));
+      }
+
+      const updatedRecord = {
+        id: overallKey,
+        student_id: studentId,
+        nama_siswa: student?.namalengkap || existingKelola.nama_siswa || 'Siswa',
+        nis: student?.nis || existingKelola.nis || '-',
+        kelas: kelas,
+        semester: semester,
+        sts: studentSts,
+        sas: studentSas,
+        sakit,
+        izin,
+        alpha,
+        sikap: sikapStr,
+        katrol: existingKelola.katrol !== undefined ? existingKelola.katrol : '',
+        nilai_akhir: finalScore,
+        updated_at: new Date().toISOString()
+      };
+
+      const matchIdx = kelolaList.findIndex(x => x.id === overallKey);
+      if (matchIdx !== -1) {
+        kelolaList[matchIdx] = updatedRecord;
+      } else {
+        kelolaList.push(updatedRecord);
+      }
+      this.setLocalTable('kelola_nilai', kelolaList);
+
+    } catch (e) {
+      console.error("Gagal sinkronisasikan kelola_nilai secara otomatis:", e);
+    }
   }
 
   async getGradesByStudent(studentId: string): Promise<GradeRecord[]> {

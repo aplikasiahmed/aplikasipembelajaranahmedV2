@@ -13,6 +13,7 @@ const PublicGrades: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [openTps, setOpenTps] = useState<Record<string, boolean>>({});
+  const [showHistory, setShowHistory] = useState(true);
 
   const toggleTp = (id: string) => {
     setOpenTps(prev => ({
@@ -105,6 +106,14 @@ const PublicGrades: React.FC = () => {
   const localTpScores = savedTpScores ? JSON.parse(savedTpScores) : {};
   const localWeights = savedWeights ? JSON.parse(savedWeights) : { harian: 35, sts: 20, sas: 20, kehadiran: 10, sikap: 15 };
 
+  // Combine local state fallbacks with database real-time records
+  const mergedTpScores = { ...localTpScores };
+  allGrades.forEach(g => {
+    if (g.description) {
+      mergedTpScores[`${student?.id}_${g.description}`] = g.score;
+    }
+  });
+
   const studentGradeLevel = student?.kelas ? String(student.kelas).trim().charAt(0) : '7';
 
   // Helper resolve details dari penilaian / tugas guru yang diambil dari JENIS PENILAIAN pada kelola-nilai
@@ -146,7 +155,7 @@ const PublicGrades: React.FC = () => {
     let count = 0;
     relatedAsms.forEach((asm: any) => {
       const scoreKey = `${student?.id}_${asm.id}`;
-      const scoreVal = localTpScores[scoreKey];
+      const scoreVal = mergedTpScores[scoreKey];
       if (scoreVal !== undefined && scoreVal !== null && scoreVal !== '') {
         sum += Number(scoreVal);
         count++;
@@ -381,7 +390,7 @@ const PublicGrades: React.FC = () => {
             <div className="bg-white p-4 md:p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-50 pb-3">
                 <BookOpen className="text-emerald-700" size={16} />
-                <h3 className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-wider">Rincian Nilai per Tugas TP</h3>
+                <h3 className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-wider">Rincian Nilai per Tugas TP (Tujuan Pembelajaran)</h3>
               </div>
               <div className="space-y-4">
                 {currentClassTps.map((tp) => {
@@ -420,7 +429,7 @@ const PublicGrades: React.FC = () => {
                           {relatedAsms.length > 0 ? (
                             relatedAsms.map((asm: any) => {
                               const scoreKey = `${student?.id}_${asm.id}`;
-                              const scoreVal = localTpScores[scoreKey];
+                              const scoreVal = mergedTpScores[scoreKey];
                               const hasScore = scoreVal !== undefined && scoreVal !== null && scoreVal !== '';
                               
                               return (
@@ -459,91 +468,101 @@ const PublicGrades: React.FC = () => {
 
           {/* LAINNYA & CATATAN TUGAS PENILAIAN */}
           <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-100">
+            <div 
+              onClick={() => setShowHistory(!showHistory)}
+              className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors"
+            >
               <h3 className="text-xs md:text-sm font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                 <Calendar size={14} /> Riwayat Penilaian Masuk
               </h3>
+              <div className="p-1 rounded-full bg-white shadow-sm border border-slate-100 text-slate-500">
+                {showHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </div>
             </div>
             
-            {filteredGrades.length > 0 ? (
-              <div className="w-full">
-                {/* Desktop View Table */}
-                <div className="hidden md:block w-full max-h-[400px] overflow-y-auto overflow-x-auto scrollbar-thin">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
-                      <tr>
-                        <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pl-4 w-1/5">Tanggal</th>
-                        <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-2/5">Penilaian / Tugas</th>
-                        <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-1/5">Keterangan</th>
-                        <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-center w-1/5">Nilai</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-xs">
-                      {filteredGrades.map((g, idx) => {
+            {showHistory && (
+              <div>
+                {filteredGrades.length > 0 ? (
+                  <div className="w-full">
+                    {/* Desktop View Table */}
+                    <div className="hidden md:block w-full max-h-[400px] overflow-y-auto overflow-x-auto scrollbar-thin">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
+                          <tr>
+                            <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pl-4 w-1/5">Tanggal</th>
+                            <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-2/5">Penilaian / Tugas</th>
+                            <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-1/5">Keterangan</th>
+                            <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-center w-1/5">Nilai</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-xs">
+                          {filteredGrades.map((g, idx) => {
+                            const details = resolveAssignmentDetails(g);
+                            return (
+                              <tr 
+                                key={g.id} 
+                                className={`border-b border-slate-50 hover:bg-slate-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'}`}
+                              >
+                                <td className="p-3 text-slate-500 font-normal pl-4">
+                                  {formatDate(g.created_at)}
+                                </td>
+                                <td className="p-3 font-semibold text-slate-700 capitalize tracking-tight truncate max-w-[180px]">
+                                  {details.taskName}
+                                </td>
+                                <td className="p-3 text-slate-500 font-medium italic break-words leading-tight">
+                                  {details.jenisPenilaian}
+                                </td>
+                                <td className="p-3 text-center">
+                                  <span className={`inline-block w-8 py-1 rounded-lg font-black text-center text-xs ${g.score >= 75 ? 'bg-emerald-50 text-emerald-600 border border-emerald-100/50' : 'bg-amber-50 text-amber-600 border border-amber-100/50'}`}>
+                                    {g.score}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile View Card Stack (Professional Mobile Ideal) */}
+                    <div className="block md:hidden divide-y divide-slate-105 max-h-[350px] overflow-y-auto scrollbar-thin">
+                      {filteredGrades.map((g) => {
                         const details = resolveAssignmentDetails(g);
                         return (
-                          <tr 
-                            key={g.id} 
-                            className={`border-b border-slate-50 hover:bg-slate-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'}`}
-                          >
-                            <td className="p-3 text-slate-500 font-normal pl-4">
-                              {formatDate(g.created_at)}
-                            </td>
-                            <td className="p-3 font-semibold text-slate-700 capitalize tracking-tight truncate max-w-[180px]">
-                              {details.taskName}
-                            </td>
-                            <td className="p-3 text-slate-500 font-medium italic break-words leading-tight">
-                              {details.jenisPenilaian}
-                            </td>
-                            <td className="p-3 text-center">
-                              <span className={`inline-block w-8 py-1 rounded-lg font-black text-center text-xs ${g.score >= 75 ? 'bg-emerald-50 text-emerald-600 border border-emerald-100/50' : 'bg-amber-50 text-amber-600 border border-amber-100/50'}`}>
+                          <div key={g.id} className="p-4 space-y-2 hover:bg-slate-50/50 transition-colors bg-white">
+                            <div className="flex justify-between items-start">
+                              <div className="space-y-0.5">
+                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  {formatDate(g.created_at)}
+                                </span>
+                                <h4 className="text-[11px] font-bold text-slate-800 leading-tight">
+                                  {details.taskName}
+                                </h4>
+                              </div>
+                              <span className={`inline-block px-2.5 py-1 rounded-xl font-black text-[11px] shadow-sm ${g.score >= 75 ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white'}`}>
                                 {g.score}
                               </span>
-                            </td>
-                          </tr>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-medium italic">
+                              <span>Keterangan Jenis:</span>
+                              <span className="text-emerald-700 font-semibold">{details.jenisPenilaian}</span>
+                            </div>
+                          </div>
                         );
                       })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Mobile View Card Stack (Professional Mobile Ideal) */}
-                <div className="block md:hidden divide-y divide-slate-105 max-h-[350px] overflow-y-auto scrollbar-thin">
-                  {filteredGrades.map((g) => {
-                    const details = resolveAssignmentDetails(g);
-                    return (
-                      <div key={g.id} className="p-4 space-y-2 hover:bg-slate-50/50 transition-colors bg-white">
-                        <div className="flex justify-between items-start">
-                          <div className="space-y-0.5">
-                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block">
-                              {formatDate(g.created_at)}
-                            </span>
-                            <h4 className="text-[11px] font-bold text-slate-800 leading-tight">
-                              {details.taskName}
-                            </h4>
-                          </div>
-                          <span className={`inline-block px-2.5 py-1 rounded-xl font-black text-[11px] shadow-sm ${g.score >= 75 ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white'}`}>
-                            {g.score}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-medium italic">
-                          <span>Keterangan Jenis:</span>
-                          <span className="text-emerald-700 font-semibold">{details.jenisPenilaian}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="p-12 text-center space-y-3">
-                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
-                  <AlertCircle size={24} />
-                </div>
-                <div>
-                  <p className="text-slate-800 font-black text-sm uppercase tracking-tight">Rincian Riwayat Kosong</p>
-                  <p className="text-slate-400 text-[10px] font-medium leading-relaxed">Belum ada riwayat manual terdaftar.</p>
-                </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-12 text-center space-y-3">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
+                      <AlertCircle size={24} />
+                    </div>
+                    <div>
+                      <p className="text-slate-800 font-black text-sm uppercase tracking-tight">Rincian Riwayat Kosong</p>
+                      <p className="text-slate-400 text-[10px] font-medium leading-relaxed">Belum ada riwayat manual terdaftar.</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
