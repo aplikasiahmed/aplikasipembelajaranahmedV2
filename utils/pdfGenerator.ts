@@ -43,6 +43,24 @@ const drawPageContent = (doc: jsPDF, type: 'nilai' | 'absensi', data: any[], met
         body = data.map(obj => Object.values(obj));
     }
 
+    const keys = data.length > 0 ? Object.keys(data[0]) : [];
+    const colStyles: any = {};
+    keys.forEach((key, idx) => {
+        if (key === 'NO') {
+            colStyles[idx] = { halign: 'center', cellWidth: 8 };
+        } else if (key === 'NIS') {
+            colStyles[idx] = { halign: 'center', cellWidth: 15 };
+        } else if (key === 'NAMA SISWA' || key === 'NAMA LENGKAP') {
+            colStyles[idx] = { halign: 'left', cellWidth: 'auto' };
+        } else if (key.includes('DESKRIPSI')) {
+            colStyles[idx] = { halign: 'left', cellWidth: 50 };
+        } else if (key === 'S' || key === 'I' || key === 'A' || key === 'H') {
+            colStyles[idx] = { halign: 'center', cellWidth: 7 };
+        } else {
+            colStyles[idx] = { halign: 'center' };
+        }
+    });
+
     autoTable(doc, {
         head: head,
         body: body,
@@ -56,16 +74,7 @@ const drawPageContent = (doc: jsPDF, type: 'nilai' | 'absensi', data: any[], met
             halign: 'center'
         },
         bodyStyles: { fontSize: 8, textColor: 50 },
-        // Kolom Styles: Kita buat semi-dinamis.
-        // Kolom 0 (NO) -> Center
-        // Kolom 1 (NIS) -> Center
-        // Kolom 2 (NAMA SISWA) -> LEFT (Sesuai Permintaan)
-        columnStyles: {
-            0: { halign: 'center', cellWidth: 8 }, // REVISI: NO lebih kecil
-            1: { halign: 'center', cellWidth: 15 }, // REVISI: NIS Dikecilkan jadi 15
-            2: { halign: 'left' }, // NAMA SISWA RATA KIRI
-            // Sisanya biar autoTable yang atur (default center dari styles)
-        },
+        columnStyles: colStyles,
         styles: { cellPadding: 1, valign: 'middle', halign: 'center' }
     });
 
@@ -82,10 +91,10 @@ const drawPageContent = (doc: jsPDF, type: 'nilai' | 'absensi', data: any[], met
         
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
-        doc.text("H = Harian", legendX, finalY + 5);
-        doc.text("TO = Tugas Online", legendX, finalY + 9);
-        doc.text("PTS/UTS = Penilaian Tengah Semester", legendX, finalY + 13);
-        doc.text("PAS/UAS = Penilaian Akhir Semester", legendX, finalY + 17);
+        doc.text("TP = Tujuan Pembelajaran", legendX, finalY + 5);
+        doc.text("RATA HARIAN = Rata-Rata Nilai Tugas TP", legendX, finalY + 9);
+        doc.text("STS = Sumatif Tengah Semester", legendX, finalY + 13);
+        doc.text("SAS = Sumatif Akhir Semester", legendX, finalY + 17);
     }
     
     const currentDate = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });

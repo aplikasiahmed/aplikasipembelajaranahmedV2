@@ -34,14 +34,8 @@ const TeacherExams: React.FC = () => {
   useEffect(() => {
     fetchExams();
     
-    const savedTps = localStorage.getItem('pai_grades_tps');
-    if (savedTps) {
-      try { setTps(JSON.parse(savedTps)); } catch (e) { console.error(e); }
-    }
-    const savedAsms = localStorage.getItem('pai_grades_assessments');
-    if (savedAsms) {
-      try { setAssessments(JSON.parse(savedAsms)); } catch (e) { console.error(e); }
-    }
+    setTps(db.getLocalTable<any>('tujuan_pembelajaran'));
+    setAssessments(db.getLocalTable<any>('asesmen_tp'));
   }, []);
 
   const fetchExams = async () => {
@@ -315,8 +309,13 @@ const TeacherExams: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 animate-fadeIn pb-20 px-1 md:px-0">
-      <button onClick={() => navigate('/guru')} className="md:hidden flex items-center gap-1.5 text-slate-800 text-[10px] font-black uppercase tracking-tight py-2 mb-1">
-        <ArrowLeft size={14} /> Kembali ke Dashboard
+      <button 
+        onClick={() => navigate('/guru')} 
+        className="group flex items-center gap-2 text-slate-700 hover:text-emerald-700 transition-all text-xs font-black uppercase tracking-wider mb-2"
+        id="btn-back-to-dashboard-utama"
+      >
+        <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" />
+        <span>DASHBOARD UTAMA</span>
       </button>
 
       {/* HEADER CARD */}
@@ -479,7 +478,7 @@ const TeacherExams: React.FC = () => {
 
                      <div className="space-y-1">
                        <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                         Integrasi Ledger (Kelola Nilai)
+                         Integrasi Ledger (Nilai Rapot)
                        </label>
                        <select
                          name="assessment_id"

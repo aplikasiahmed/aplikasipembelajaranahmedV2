@@ -257,12 +257,13 @@ const TeacherTaskCheck: React.FC = () => {
 
   return (
     <div className="space-y-3 md:space-y-6 animate-fadeIn pb-20">
-      {/* Mobile Back Button */}
       <button 
-        onClick={() => navigate('/guru')}
-        className="md:hidden flex items-center gap-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-tight mb-1"
+        onClick={() => navigate('/guru')} 
+        className="group flex items-center gap-2 text-slate-700 hover:text-emerald-700 transition-all text-xs font-black uppercase tracking-wider mb-2"
+        id="btn-back-to-dashboard-utama"
       >
-        <ArrowLeft size={14} /> Kembali ke Dashboard
+        <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" />
+        <span>DASHBOARD UTAMA</span>
       </button>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">

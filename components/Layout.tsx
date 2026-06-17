@@ -14,7 +14,10 @@ import {
   LayoutDashboard,
   FileSearch,
   Users,
-  Scroll
+  Scroll,
+  TrendingUp,
+  Scale,
+  Target
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 import TeacherLogin from '../pages/TeacherLogin';
@@ -87,13 +90,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const teacherLinks = [
     { name: 'Dashboard', path: '/guru', icon: LayoutDashboard },
+    { name: 'Tujuan Pembelajaran', path: '/guru/tujuanpembelajaran', icon: Target },
+    { name: 'Bobot Penilaian', path: '/guru/bobotnilai', icon: Scale },
+    { name: 'Data Siswa', path: '/guru/datasiswa', icon: Users },
     { name: 'Input Nilai', path: '/guru/nilai', icon: Award },
-    { name: 'Kelola Nilai', path: '/guru/kelola-nilai', icon: Scroll },
     { name: 'Input Absensi', path: '/guru/absensi', icon: ClipboardCheck },
     { name: 'Cek Tugas Siswa', path: '/guru/tugas-masuk', icon: FileSearch },
-    { name: 'Bank Soal', path: '/guru/ujian', icon: FileEdit }, // Menu Baru
-    { name: 'Laporan Database', path: '/guru/laporan', icon: Settings },
+    { name: 'Bank Soal', path: '/guru/ujian', icon: FileEdit },
+    { name: 'Nilai Rapot', path: '/guru/Nilai-rapot', icon: Scroll },
+    { name: 'Laporan Nilai', path: '/guru/laporan', icon: TrendingUp },
     { name: 'Kelola Admin', path: '/guru/admin', icon: ShieldCheck },
+    { name: 'Pengaturan', path: '/guru/pengaturan', icon: Settings },
   ];
 
   if (isTeacherPage) {

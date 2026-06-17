@@ -118,7 +118,14 @@ const TeacherInputAbsensi: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-2 md:space-y-6 animate-fadeIn pb-20 px-1 md:px-0">
-      <button onClick={() => navigate('/guru')} className="md:hidden flex items-center gap-1.5 text-slate-800 text-[10px] font-black uppercase tracking-tight py-2 mb-1"><ArrowLeft size={14} /> Kembali ke Dashboard</button>
+      <button 
+        onClick={() => navigate('/guru')} 
+        className="group flex items-center gap-2 text-slate-700 hover:text-emerald-700 transition-all text-xs font-black uppercase tracking-wider mb-4"
+        id="btn-back-to-dashboard-utama"
+      >
+        <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" />
+        <span>DASHBOARD UTAMA</span>
+      </button>
       <div className="bg-amber-600 text-white p-4 md:p-8 rounded-2xl md:rounded-3xl shadow-lg">
         <h1 className="text-base md:text-2xl font-black leading-tight uppercase tracking-tighter">Input Absensi PAI</h1>
         <p className="text-amber-50 text-[9px] md:text-sm mt-0.5 opacity-90">Masukkan kehadiran harian siswa.</p>

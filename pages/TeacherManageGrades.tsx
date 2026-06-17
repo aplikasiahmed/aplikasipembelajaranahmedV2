@@ -62,7 +62,7 @@ const TeacherManageGrades: React.FC = () => {
   const navigate = useNavigate();
 
   // --- APP STATE ---
-  const [activeTab, setActiveTab] = useState<'tp' | 'penilaian' | 'input' | 'bobot' | 'rekap'>('tp');
+  const [activeTab, setActiveTab] = useState<'input' | 'rekap'>('input');
   const [selectedGrade, setSelectedGrade] = useState<string>('7');
   const [selectedKelas, setSelectedKelas] = useState<string>('');
   const [selectedSemester, setSelectedSemester] = useState<string>('1');
@@ -174,7 +174,7 @@ const TeacherManageGrades: React.FC = () => {
           }
         });
 
-        // 3. Fetch kelola_nilai records for custom Sikap & Katrol values
+        // 3. Fetch nilai_rapot records for custom Sikap & Katrol values
         const kelolaNilaiRecords = await db.getKelolaNilai();
         const dbSikap: Record<string, string> = {};
         const dbKatrol: Record<string, number | ''> = {};
@@ -270,15 +270,12 @@ const TeacherManageGrades: React.FC = () => {
     }
 
     // Load TP list
-    const savedTps = localStorage.getItem('pai_grades_tps');
-    if (savedTps) {
-      try {
-        setTps(JSON.parse(savedTps));
-      } catch (e) {
-        console.error(e);
-      }
+    const hasTpsStorage = localStorage.getItem('pai_grades_tps') !== null;
+    const savedTps = db.getLocalTable<TP>('tujuan_pembelajaran');
+    if (hasTpsStorage) {
+      setTps(savedTps);
     } else {
-      // Seed default TPs if empty
+      // Seed default TPs if empty and never saved before
       const defaultTps: TP[] = [
         { id: 'tp-1', code: 'TP 1', name: 'Al-Qur\'an dan Hadis', description: 'Memahami hukum bacaan Al-Qur\'an dan Hadis tentang toleransi', subject: 'Pendidikan Agama Islam (PAI)', grade: '7', semester: '1' },
         { id: 'tp-2', code: 'TP 2', name: 'Meneladani Asmaul Husna', description: 'Mengamalkan perilaku terpuji yang mencerminkan Asmaul Husna', subject: 'Pendidikan Agama Islam (PAI)', grade: '7', semester: '1' },
@@ -286,20 +283,17 @@ const TeacherManageGrades: React.FC = () => {
         { id: 'tp-4', code: 'TP 4', name: 'Sejarah Nabi Muhammad', description: 'Memahami lembaran sejarah perjuangan dakwah Rasulullah SAW', subject: 'Pendidikan Agama Islam (PAI)', grade: '7', semester: '1' },
         { id: 'tp-5', code: 'TP 5', name: 'Bersuci dan Shalat Berjamaah', description: 'Mempraktikkan cara bersuci dari hadas dan shalat berjamaah', subject: 'Pendidikan Agama Islam (PAI)', grade: '7', semester: '1' },
       ];
-      localStorage.setItem('pai_grades_tps', JSON.stringify(defaultTps));
+      db.setLocalTable('tujuan_pembelajaran', defaultTps);
       setTps(defaultTps);
     }
 
     // Load Assessments list
-    const savedAsms = localStorage.getItem('pai_grades_assessments');
-    if (savedAsms) {
-      try {
-        setAssessments(JSON.parse(savedAsms));
-      } catch (e) {
-        console.error(e);
-      }
+    const hasAsmsStorage = localStorage.getItem('pai_grades_assessments') !== null;
+    const savedAsms = db.getLocalTable<TPAssessment>('asesmen_tp');
+    if (hasAsmsStorage) {
+      setAssessments(savedAsms);
     } else {
-      // Seed default Assessments for default TPs
+      // Seed default Assessments for default TPs if empty and never saved before
       const defaultAsms: TPAssessment[] = [
         { id: 'asm-1', tpId: 'tp-1', name: 'Tugas 1 (Hukum Bacaan)', type: 'Penulisan' },
         { id: 'asm-2', tpId: 'tp-1', name: 'Tugas 2 (Hafalan Surat)', type: 'Hafalan' },
@@ -313,7 +307,7 @@ const TeacherManageGrades: React.FC = () => {
         { id: 'asm-10', tpId: 'tp-5', name: 'Tugas 1 (Wudhu & Tayamum)', type: 'Praktik' },
         { id: 'asm-11', tpId: 'tp-5', name: 'Tugas 2 (Bacaan Shalat)', type: 'Hafalan' },
       ];
-      localStorage.setItem('pai_grades_assessments', JSON.stringify(defaultAsms));
+      db.setLocalTable('asesmen_tp', defaultAsms);
       setAssessments(defaultAsms);
     }
 
@@ -332,12 +326,12 @@ const TeacherManageGrades: React.FC = () => {
 
   // Sync state to local storage helper
   const saveTpsToStorage = (updatedTps: TP[]) => {
-    localStorage.setItem('pai_grades_tps', JSON.stringify(updatedTps));
+    db.setLocalTable('tujuan_pembelajaran', updatedTps);
     setTps(updatedTps);
   };
 
   const saveAssessmentsToStorage = (updatedAsms: TPAssessment[]) => {
-    localStorage.setItem('pai_grades_assessments', JSON.stringify(updatedAsms));
+    db.setLocalTable('asesmen_tp', updatedAsms);
     setAssessments(updatedAsms);
   };
 
@@ -353,7 +347,7 @@ const TeacherManageGrades: React.FC = () => {
 
   // Switch initial selection when tab state changes
   useEffect(() => {
-    const currentClassTps = tps.filter(t => t.grade === selectedGrade && t.semester === selectedSemester);
+    const currentClassTps = tps.filter(t => String(t.grade) === String(selectedGrade) && String(t.semester) === String(selectedSemester));
     if (currentClassTps.length > 0 && !selectedTpId) {
       setSelectedTpId(currentClassTps[0].id);
     }
@@ -365,7 +359,7 @@ const TeacherManageGrades: React.FC = () => {
       ...prev,
       grade: selectedGrade,
       semester: selectedSemester,
-      code: `TP ${tps.filter(t => t.grade === selectedGrade && t.semester === selectedSemester).length + 1}`
+      code: `TP ${tps.filter(t => String(t.grade) === String(selectedGrade) && String(t.semester) === String(selectedSemester)).length + 1}`
     }));
   }, [selectedGrade, selectedSemester, tps]);
 
@@ -491,7 +485,7 @@ const TeacherManageGrades: React.FC = () => {
     const newAsms: TPAssessment[] = [];
 
     // Filter existing ones to avoid duplicating existing code
-    const currentClassTpsInternal = tps.filter(t => t.grade === gradeLevel && t.semester === smt);
+    const currentClassTpsInternal = tps.filter(t => String(t.grade) === String(gradeLevel) && String(t.semester) === String(smt));
     const existingCodes = currentClassTpsInternal.map(t => t.code);
     
     tpsPreset.forEach((preset, idx) => {
@@ -676,34 +670,12 @@ const TeacherManageGrades: React.FC = () => {
     Swal.fire({ icon: 'success', title: 'Penilaian Dihapus', timer: 1500, showConfirmButton: false, heightAuto: false });
   };
 
-  // 3. Save Overall Weights Settings
-  const handleSaveWeights = () => {
-    const total = 
-      Number(weights.harian) + 
-      Number(weights.sts) + 
-      Number(weights.sas) + 
-      Number(weights.kehadiran ?? 10) + 
-      Number(weights.sikap ?? 15);
-      
-    if (total !== 100) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Bobot Tidak Valid',
-        text: `Total bobot harus tepat 100%, saat ini totalnya: ${total}%`,
-        heightAuto: false
-      });
-      return;
-    }
-
-    localStorage.setItem('pai_grade_weights', JSON.stringify(weights));
-    Swal.fire({ icon: 'success', title: 'Bobot Penilaian Berhasil Disimpan', timer: 2000, showConfirmButton: false, heightAuto: false });
-  };
 
   // --- HELPER MATH CALCULATOR FUNCTIONS & DERIVED STATES ---
 
   // Filter current active TPs according to grade and semester (sorted starting from TP 1)
   const currentClassTps = tps
-    .filter(t => t.grade === selectedGrade && t.semester === selectedSemester)
+    .filter(t => String(t.grade) === String(selectedGrade) && String(t.semester) === String(selectedSemester))
     .sort((a, b) => {
       const codeA = String(a.code || '').toLowerCase();
       const codeB = String(b.code || '').toLowerCase();
@@ -1125,7 +1097,7 @@ const TeacherManageGrades: React.FC = () => {
           listToUpdate.push({
             score: calculs.finalScore,
             type: 'uas',
-            desc: 'Nilai Akhir Rapor (Kelola Nilai)'
+            desc: 'Nilai Akhir Rapor (Nilai Rapot)'
           });
         }
 
@@ -1148,7 +1120,7 @@ const TeacherManageGrades: React.FC = () => {
         Swal.fire({
           icon: 'success',
           title: 'Berhasil Disinkronkan!',
-          text: `Data Kelola Nilai Kelas ${selectedKelas} Semester ${selectedSemester} berhasil disimpan dan disinkronkan ke Google Sheets!`,
+          text: `Data Nilai Rapot Kelas ${selectedKelas} Semester ${selectedSemester} berhasil disimpan dan disinkronkan ke Google Sheets!`,
           confirmButtonColor: '#059669',
           heightAuto: false
         });
@@ -1246,9 +1218,11 @@ const TeacherManageGrades: React.FC = () => {
       <div className="flex items-center justify-between pb-2">
         <button 
           onClick={() => navigate('/guru')} 
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold uppercase transition"
+          className="group flex items-center gap-2 text-slate-700 hover:text-emerald-700 transition-all text-xs font-black uppercase tracking-wider mb-2"
+          id="btn-back-to-dashboard-utama"
         >
-          <ArrowLeft size={14} /> Kembali ke Dashboard
+          <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" />
+          <span>DASHBOARD UTAMA</span>
         </button>
       </div>
 
@@ -1262,7 +1236,7 @@ const TeacherManageGrades: React.FC = () => {
             Fitur Lanjutan Guru
           </span>
           <h1 className="text-xl md:text-3xl font-black uppercase tracking-tight">
-            Kelola Nilai & Pencapaian TP PAI
+            Nilai Rapot & Pencapaian TP PAI
           </h1>
           <p className="text-emerald-100/90 text-xs md:text-sm font-medium max-w-xl leading-relaxed">
             Sistem rekapitulasi penilaian digital per Tujuan Pembelajaran (TP). Hitung rata-rata, pembobotan Penilaian Harian, STS, SAS, pengubahan sikap dan kehadiran secara terintegrasi.
@@ -1318,41 +1292,23 @@ const TeacherManageGrades: React.FC = () => {
       {/* VISUAL TABS CONTROL */}
       <div className="flex border-b border-slate-200 overflow-x-auto scrollbar-none gap-1 bg-slate-100 p-1 rounded-2xl">
         <button 
-          onClick={() => setActiveTab('tp')}
-          className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition whitespace-nowrap ${activeTab === 'tp' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-        >
-          <BookOpen size={14} /> 1. Kelola Data TP
-        </button>
-        <button 
-          onClick={() => setActiveTab('penilaian')}
-          className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition whitespace-nowrap ${activeTab === 'penilaian' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-        >
-          <ListFilter size={14} /> 2. Penilaian per TP
-        </button>
-        <button 
           onClick={() => setActiveTab('input')}
           className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition whitespace-nowrap ${activeTab === 'input' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
         >
-          <Edit2 size={14} /> 3. Input Nilai Siswa
-        </button>
-        <button 
-          onClick={() => setActiveTab('bobot')}
-          className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition whitespace-nowrap ${activeTab === 'bobot' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-        >
-          <Settings size={14} /> 4. Bobot Penilaian
+          <Edit2 size={14} /> 1. Input Nilai Siswa
         </button>
         <button 
           onClick={() => setActiveTab('rekap')}
           className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition whitespace-nowrap ${activeTab === 'rekap' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
         >
-          <Scroll size={14} /> 5. Rekap Laporan Akhir
+          <Scroll size={14} /> 2. Rekap Laporan Akhir
         </button>
       </div>
 
       {/* ========================================================
           TAB 1: KELOLA DATA TP (TUJUAN PEMBELAJARAN)
           ======================================================== */}
-      {activeTab === 'tp' && (
+      {false && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Form */}
           <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
@@ -1520,7 +1476,7 @@ const TeacherManageGrades: React.FC = () => {
       {/* ========================================================
           TAB 2: PENILAIAN PER TP (ASSESSMENTS PER TP LEVEL)
           ======================================================== */}
-      {activeTab === 'penilaian' && (
+      {false && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           
           {/* Create Assignment Form */}
@@ -1848,145 +1804,7 @@ const TeacherManageGrades: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================
-          TAB 4: CONFIGURATION OF GRADES COEFFICIENT (WEIGHTS)
-          ======================================================== */}
-      {activeTab === 'bobot' && (
-        <div className="max-w-xl mx-auto bg-white p-5 md:p-8 rounded-2xl border border-slate-100 shadow-sm space-y-6">
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
-            <div className="bg-emerald-50 text-emerald-800 p-2 rounded-xl">
-              <Settings size={20} />
-            </div>
-            <div>
-              <h2 className="text-sm font-black uppercase text-slate-800">Skema Pengaturan Bobot Nilai Akhir</h2>
-              <p className="text-[10px] text-slate-400">Atur bobot tiap jenis penilaian untuk akumulasi raport semester.</p>
-            </div>
-          </div>
 
-          <div className="bg-amber-50 p-4 rounded-xl border border-amber-200/60 flex items-start gap-2 text-amber-900 text-xs">
-            <ShieldAlert size={16} className="text-amber-600 mt-0.5 shrink-0" />
-            <div className="space-y-1">
-              <strong className="font-bold">Ketentuan Sistem Bobot:</strong>
-              <p className="text-slate-600 font-medium leading-relaxed">
-                Total persentase dari ketiga komponen (Nilai Harian, STS, SAS) wajib bernilai <strong className="text-slate-800">tepat 100%</strong>. Perubahan ini akan langsung memengaruhi skor Nilai Akhir di seluruh raport siswa secara dinamis.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {/* Kehadiran */}
-            <div>
-              <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1">
-                <span className="text-slate-500">Bobot Kehadiran</span>
-                <span className="text-cyan-700">{weights.kehadiran ?? 10}%</span>
-              </div>
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                step="5"
-                value={weights.kehadiran ?? 10}
-                onChange={(e) => setWeights({ ...weights, kehadiran: parseInt(e.target.value) })}
-                className="w-full accent-cyan-600 cursor-pointer"
-              />
-            </div>
-
-            {/* Sikap */}
-            <div>
-              <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1">
-                <span className="text-slate-500">Bobot Nilai Sikap</span>
-                <span className="text-purple-700">{weights.sikap ?? 15}%</span>
-              </div>
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                step="5"
-                value={weights.sikap ?? 15}
-                onChange={(e) => setWeights({ ...weights, sikap: parseInt(e.target.value) })}
-                className="w-full accent-purple-600 cursor-pointer"
-              />
-            </div>
-
-            {/* Harian (Tugas TP) */}
-            <div>
-              <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1">
-                <span className="text-slate-500">Nilai Tugas-tugas Per TP</span>
-                <span className="text-emerald-700">{weights.harian}%</span>
-              </div>
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                step="5"
-                value={weights.harian}
-                onChange={(e) => setWeights({ ...weights, harian: parseInt(e.target.value) })}
-                className="w-full accent-emerald-600 cursor-pointer"
-              />
-            </div>
-
-            {/* STS */}
-            <div>
-              <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1">
-                <span className="text-slate-500">Sumatif Tengah Semester (STS)</span>
-                <span className="text-rose-700">{weights.sts}%</span>
-              </div>
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                step="5"
-                value={weights.sts}
-                onChange={(e) => setWeights({ ...weights, sts: parseInt(e.target.value) })}
-                className="w-full accent-rose-600 cursor-pointer"
-              />
-            </div>
-
-            {/* SAS */}
-            <div>
-              <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1">
-                <span className="text-slate-500">Sumatif Akhir Semester (SAS)</span>
-                <span className="text-indigo-700">{weights.sas}%</span>
-              </div>
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                step="5"
-                value={weights.sas}
-                onChange={(e) => setWeights({ ...weights, sas: parseInt(e.target.value) })}
-                className="w-full accent-indigo-600 cursor-pointer"
-              />
-            </div>
-
-            {/* Dynamic visual graph meter */}
-            <div className="pt-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Status Bobot Kumulatif</label>
-              <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden flex shadow-inner border border-slate-200">
-                <div style={{ width: `${weights.kehadiran ?? 10}%` }} className="bg-cyan-600 transition-all text-[8px] flex items-center justify-center font-bold text-white uppercase">{(weights.kehadiran ?? 10) > 0 && 'Hadir'}</div>
-                <div style={{ width: `${weights.sikap ?? 15}%` }} className="bg-purple-600 transition-all text-[8px] flex items-center justify-center font-bold text-white uppercase">{(weights.sikap ?? 15) > 0 && 'Sikap'}</div>
-                <div style={{ width: `${weights.harian}%` }} className="bg-emerald-600 transition-all text-[8px] flex items-center justify-center font-bold text-white uppercase">{weights.harian > 0 && 'Tugas'}</div>
-                <div style={{ width: `${weights.sts}%` }} className="bg-rose-500 transition-all text-[8px] flex items-center justify-center font-bold text-white uppercase">{weights.sts > 0 && 'STS'}</div>
-                <div style={{ width: `${weights.sas}%` }} className="bg-indigo-600 transition-all text-[8px] flex items-center justify-center font-bold text-white uppercase">{weights.sas > 0 && 'SAS'}</div>
-              </div>
-              
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-[10px] font-bold text-slate-400">Total Akumulasi:</span>
-                <strong className={`text-xs font-black ${((weights.kehadiran ?? 10) + (weights.sikap ?? 15) + weights.harian + weights.sts + weights.sas) === 100 ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {(weights.kehadiran ?? 10) + (weights.sikap ?? 15) + weights.harian + weights.sts + weights.sas}%
-                </strong>
-              </div>
-            </div>
-
-            <button 
-              onClick={handleSaveWeights}
-              className="w-full py-3.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs uppercase shadow-md active:scale-95 transition"
-            >
-              Simpan Skema Bobot
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================
           TAB 5: REKAP DAN LAPORAN AKHIR

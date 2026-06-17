@@ -186,9 +186,24 @@ const TeacherExamEditor: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 animate-fadeIn pb-24 px-1 md:px-0">
-      <button onClick={() => navigate('/guru/ujian')} className="flex items-center gap-1.5 text-slate-800 text-[10px] font-black uppercase tracking-tight py-2 mb-1">
-        <ArrowLeft size={14} /> Kembali ke Bank Soal
-      </button>
+      <div className="flex flex-wrap gap-4 items-center mb-2">
+        <button 
+          onClick={() => navigate('/guru')} 
+          className="group flex items-center gap-2 text-slate-700 hover:text-emerald-700 transition-all text-xs font-black uppercase tracking-wider"
+          id="btn-back-to-dashboard-utama"
+        >
+          <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" />
+          <span>DASHBOARD UTAMA</span>
+        </button>
+        <span className="text-slate-300">/</span>
+        <button 
+          onClick={() => navigate('/guru/ujian')}
+          className="text-slate-500 hover:text-slate-800 text-xs font-black uppercase transition"
+          id="btn-back-to-bank-soal"
+        >
+          Kembali ke Bank Soal
+        </button>
+      </div>
 
       <div className="bg-emerald-700 text-white p-5 rounded-2xl shadow-lg">
         <div className="flex justify-between items-start">

@@ -10,6 +10,8 @@ interface ExcelMeta {
   tahun?: string;
   withValidation?: boolean;
   type?: 'nilai' | 'absensi'; // NEW
+  availableTypes?: string[];
+  availableAssessments?: string[];
 }
 
 const setupWorksheet = (sheet: any, data: any[], meta?: ExcelMeta) => {
@@ -139,8 +141,69 @@ const setupWorksheet = (sheet: any, data: any[], meta?: ExcelMeta) => {
     // 4. FITUR DATA VALIDATION (Hanya untuk Template Import Siswa/Nilai Manual)
     if (meta?.withValidation) {
         const startRow = 7;
-        const endRow = 100;
-        // Logic validation disesuaikan jika perlu
+        const endRow = 7 + data.length + 50;
+
+        // Find Column indexes
+        const headers = Object.keys(data[0]);
+        const jenisColIdx = headers.indexOf('JENIS TUGAS');
+        const ketColIdx = headers.indexOf('KET/MATERI');
+        const nilaiColIdx = headers.indexOf('NILAI');
+
+        const colLetter = (idx: number) => String.fromCharCode(65 + idx);
+
+        if (jenisColIdx !== -1) {
+            const col = colLetter(jenisColIdx);
+            const types = meta.availableTypes || ['Harian', 'PTS', 'UAS', 'Praktik'];
+            const typesFormula = `"${types.join(',')}"`;
+            for (let i = startRow; i <= endRow; i++) {
+                sheet.getCell(`${col}${i}`).dataValidation = {
+                    type: 'list',
+                    allowBlank: true,
+                    formulae: [typesFormula],
+                    showErrorMessage: true,
+                    errorStyle: 'stop',
+                    errorTitle: 'Input Tidak Valid',
+                    error: 'Pilih Jenis Tugas dari daftar yang disediakan.'
+                };
+            }
+        }
+
+        if (ketColIdx !== -1 && meta.availableAssessments && meta.availableAssessments.length > 0) {
+            const col = colLetter(ketColIdx);
+            // Replace commas in names so they don't break the list formula separators
+            const cleanAsms = meta.availableAssessments.map(name => name.replace(/,/g, ' ').replace(/"/g, ''));
+            const asmFormula = `"${cleanAsms.join(',')}"`;
+
+            if (asmFormula.length < 255) {
+                for (let i = startRow; i <= endRow; i++) {
+                    sheet.getCell(`${col}${i}`).dataValidation = {
+                        type: 'list',
+                        allowBlank: true,
+                        formulae: [asmFormula],
+                        showErrorMessage: true,
+                        errorStyle: 'stop',
+                        errorTitle: 'Input Tidak Valid',
+                        error: 'Pilih Penilaian/Tugas dari daftar yang disediakan.'
+                    };
+                }
+            }
+        }
+
+        if (nilaiColIdx !== -1) {
+            const col = colLetter(nilaiColIdx);
+            for (let i = startRow; i <= endRow; i++) {
+                sheet.getCell(`${col}${i}`).dataValidation = {
+                    type: 'whole',
+                    operator: 'between',
+                    allowBlank: true,
+                    formulae: ['0', '100'],
+                    showErrorMessage: true,
+                    errorStyle: 'stop',
+                    errorTitle: 'Nilai Tidak Valid',
+                    error: 'Nilai harus berupa angka bulat antara 0 sampai 100.'
+                };
+            }
+        }
     }
 };
 

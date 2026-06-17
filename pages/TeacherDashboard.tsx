@@ -12,7 +12,10 @@ import {
   ArrowRight,
   FileEdit,
   CheckCircle2,
-  LayoutDashboard
+  LayoutDashboard,
+  Settings,
+  Scale,
+  Target
 } from 'lucide-react';
 import { db } from '../services/supabaseMock';
 
@@ -44,13 +47,17 @@ const TeacherDashboard: React.FC = () => {
   }, []);
 
   const menuItems = [
+    { title: 'Tujuan Pembelajaran', path: '/guru/tujuanpembelajaran', icon: Target, color: 'bg-emerald-800', text: 'text-emerald-800', bg: 'bg-emerald-50 border border-emerald-100', desc: 'Kelola Capaian Kompetensi & TP' },
+    { title: 'Bobot Penilaian', path: '/guru/bobotnilai', icon: Scale, color: 'bg-emerald-700', text: 'text-emerald-700', bg: 'bg-emerald-50 border border-emerald-100/50', desc: 'Atur Kontribusi Persentase Nilai' },
+    { title: 'Data Siswa', path: '/guru/datasiswa', icon: Users, color: 'bg-blue-600', text: 'text-blue-600', bg: 'bg-blue-50/80 border border-blue-100', desc: 'Kelola & Import data siswa' },
     { title: 'Input Nilai', path: '/guru/nilai', icon: Award, color: 'bg-emerald-600', text: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Kelola nilai harian & ujian' },
-    { title: 'Kelola Nilai', path: '/guru/kelola-nilai', icon: Scroll, color: 'bg-emerald-800', text: 'text-emerald-800', bg: 'bg-emerald-50 border border-emerald-100', desc: 'Rekap TP, STS, SAS & Raport akhir' },
     { title: 'Input Absensi', path: '/guru/absensi', icon: ClipboardCheck, color: 'bg-amber-600', text: 'text-amber-600', bg: 'bg-amber-50', desc: 'Rekap kehadiran harian' },
     { title: 'Cek Tugas', path: '/guru/tugas-masuk', icon: FileText, color: 'bg-purple-600', text: 'text-purple-600', bg: 'bg-purple-50', desc: 'Koreksi tugas & ujian' },
     { title: 'Bank Soal', path: '/guru/ujian', icon: FileEdit, color: 'bg-pink-600', text: 'text-pink-600', bg: 'bg-pink-50', desc: 'Buat & Kelola Soal Ujian' },
+    { title: 'Nilai Rapot', path: '/guru/Nilai-rapot', icon: Scroll, color: 'bg-emerald-850', text: 'text-emerald-850', bg: 'bg-emerald-50 border border-emerald-150', desc: 'Rekap TP, STS, SAS & Raport akhir' },
     { title: 'Laporan', path: '/guru/laporan', icon: TrendingUp, color: 'bg-red-600', text: 'text-red-600', bg: 'bg-red-50', desc: 'Export PDF & Excel' },
     { title: 'Kelola Admin', path: '/guru/admin', icon: ShieldCheck, color: 'bg-blue-600', text: 'text-blue-600', bg: 'bg-blue-50', desc: 'Manajemen akun pengajar' },
+    { title: 'Pengaturan', path: '/guru/pengaturan', icon: Settings, color: 'bg-slate-600', text: 'text-slate-600', bg: 'bg-slate-50', desc: 'Integrasi Sheets, Excel & DB Reset' },
   ];
 
   return (

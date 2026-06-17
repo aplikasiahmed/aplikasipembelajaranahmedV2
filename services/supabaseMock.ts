@@ -16,26 +16,87 @@ const TABS_CONFIG: SheetConfig[] = [
   { name: 'ujian', headers: ['id', 'title', 'grade', 'category', 'semester', 'duration', 'deadline', 'is_random', 'status', 'created_at', 'tp_id', 'assessment_id'] },
   { name: 'bank_soal', headers: ['id', 'exam_id', 'type', 'text', 'image_url', 'options', 'correct_answer'] },
   { name: 'hasil_ujian', headers: ['id', 'exam_id', 'student_nis', 'student_name', 'student_class', 'semester', 'answers', 'score', 'violation_count', 'started_at', 'submitted_at'] },
-  { name: 'kelola_nilai', headers: ['id', 'student_id', 'nama_siswa', 'nis', 'kelas', 'semester', 'sts', 'sas', 'sakit', 'izin', 'alpha', 'sikap', 'katrol', 'nilai_akhir', 'updated_at'] }
+  { name: 'nilai_rapot', headers: ['id', 'student_id', 'nama_siswa', 'nis', 'kelas', 'semester', 'sts', 'sas', 'sakit', 'izin', 'alpha', 'sikap', 'katrol', 'nilai_akhir', 'updated_at'] },
+  { name: 'tujuan_pembelajaran', headers: ['id', 'code', 'name', 'description', 'subject', 'grade', 'semester'] },
+  { name: 'asesmen_tp', headers: ['id', 'tpId', 'name', 'type'] }
 ];
 
 class DatabaseService {
   private isSyncingFromSheets = false;
   // HELPER LOKAL DATASTORAGE (LOCALSTORAGE)
-  private getLocalTable<T>(name: string): T[] {
-    const key = `pai_db_${name}`;
-    const data = localStorage.getItem(key);
+  public getLocalTable<T>(name: string): T[] {
+    let key = `pai_db_${name}`;
+    if (name === 'tujuan_pembelajaran') key = 'pai_grades_tps';
+    if (name === 'asesmen_tp') key = 'pai_grades_assessments';
+    let data = localStorage.getItem(key);
+    if (!data && name === 'nilai_rapot') {
+      const oldKeysData = localStorage.getItem('pai_db_kelola_nilai');
+      if (oldKeysData) {
+        localStorage.setItem(key, oldKeysData);
+        data = oldKeysData;
+      }
+    }
     if (!data) return [];
     try {
-      return JSON.parse(data) as T[];
+      const parsed = JSON.parse(data) as any[];
+      if (Array.isArray(parsed)) {
+        return parsed.map((item: any) => {
+          if (!item || typeof item !== 'object') return item;
+          const newItem = { ...item };
+          if (newItem.grade !== undefined && newItem.grade !== null) {
+            newItem.grade = String(newItem.grade).trim();
+          }
+          if (newItem.semester !== undefined && newItem.semester !== null) {
+            newItem.semester = String(newItem.semester).trim();
+          }
+          if (newItem.id !== undefined && newItem.id !== null) {
+            newItem.id = String(newItem.id).trim();
+          }
+          if (newItem.tpId !== undefined && newItem.tpId !== null) {
+            newItem.tpId = String(newItem.tpId).trim();
+          }
+          if (newItem.kelas !== undefined && newItem.kelas !== null) {
+            newItem.kelas = String(newItem.kelas).trim();
+          }
+          return newItem;
+        }) as any[];
+      }
+      return parsed as T[];
     } catch (_) {
       return [];
     }
   }
 
-  private setLocalTable<T>(name: string, data: T[]): void {
-    const key = `pai_db_${name}`;
-    localStorage.setItem(key, JSON.stringify(data));
+  public setLocalTable<T>(name: string, data: T[]): void {
+    let key = `pai_db_${name}`;
+    if (name === 'tujuan_pembelajaran') key = 'pai_grades_tps';
+    if (name === 'asesmen_tp') key = 'pai_grades_assessments';
+    
+    let processedData = data;
+    if (Array.isArray(data)) {
+      processedData = data.map((item: any) => {
+        if (!item || typeof item !== 'object') return item;
+        const newItem = { ...item };
+        if (newItem.grade !== undefined && newItem.grade !== null) {
+          newItem.grade = String(newItem.grade).trim();
+        }
+        if (newItem.semester !== undefined && newItem.semester !== null) {
+          newItem.semester = String(newItem.semester).trim();
+        }
+        if (newItem.id !== undefined && newItem.id !== null) {
+          newItem.id = String(newItem.id).trim();
+        }
+        if (newItem.tpId !== undefined && newItem.tpId !== null) {
+          newItem.tpId = String(newItem.tpId).trim();
+        }
+        if (newItem.kelas !== undefined && newItem.kelas !== null) {
+          newItem.kelas = String(newItem.kelas).trim();
+        }
+        return newItem;
+      }) as any[];
+    }
+    
+    localStorage.setItem(key, JSON.stringify(processedData));
     
     // Auto-sync in background to Google Sheets if not pulling from sheets
     if (!this.isSyncingFromSheets) {
@@ -99,6 +160,29 @@ class DatabaseService {
 
     if (['options', 'opsi', 'choices', 'pilihan', 'pilihan_jawaban', 'pilihanjawaban', 'option'].includes(cleanParsed)) {
       if (expectedHeaders.includes('options')) return 'options';
+    }
+
+    // Mappings for tujuan_pembelajaran & asesmen_tp
+    if (['code', 'notp', 'nomortp', 'notp1', 'kode', 'kodetp', 'idtp', 'notujian'].includes(cleanParsed)) {
+      if (expectedHeaders.includes('code')) return 'code';
+    }
+    if (['name', 'namatp', 'tujuan', 'tujuanpembelajaran', 'isi', 'judul', 'title'].includes(cleanParsed)) {
+      if (expectedHeaders.includes('name')) return 'name';
+    }
+    if (['description', 'deskripsi', 'ringkasan', 'keterangan'].includes(cleanParsed)) {
+      if (expectedHeaders.includes('description')) return 'description';
+    }
+    if (['subject', 'mapel', 'matapelajaran', 'subjek'].includes(cleanParsed)) {
+      if (expectedHeaders.includes('subject')) return 'subject';
+    }
+    if (['grade', 'kelas', 'kls'].includes(cleanParsed)) {
+      if (expectedHeaders.includes('grade')) return 'grade';
+    }
+    if (['semester', 'smt', 'sem'].includes(cleanParsed)) {
+      if (expectedHeaders.includes('semester')) return 'semester';
+    }
+    if (['tpid', 'tp_id', 'kodetp', 'code_tp'].includes(cleanParsed)) {
+      if (expectedHeaders.includes('tpId')) return 'tpId';
     }
 
     return parsedStr.toLowerCase();
@@ -432,7 +516,17 @@ class DatabaseService {
         values.push(row);
       });
 
-      // 4. Update data dalam sekali panggil PUT API
+      // 4. Bersihkan data lama di range A1:Z5000 terlebih dahulu agar baris di bagian bawah tidak tersisa jika ada data yang dihapus
+      try {
+        await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z5000:clear`, {
+          method: 'POST',
+          body: JSON.stringify({})
+        }, token);
+      } catch (clearErr) {
+        console.warn(`Gagal membersihkan range lama di sheet ${tableName}:`, clearErr);
+      }
+
+      // 5. Update data dalam sekali panggil PUT API
       await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z5000?valueInputOption=USER_ENTERED`, {
         method: 'PUT',
         body: JSON.stringify({
@@ -588,7 +682,7 @@ class DatabaseService {
                       });
                     }
                     // Filter row-row kosong
-                    if (Object.keys(obj).length > 0 && (obj.id || obj.nis || obj.nisn || obj.title)) {
+                    if (Object.keys(obj).length > 0 && (obj.id || obj.nis || obj.nisn || obj.title || obj.code || obj.name || obj.tpId)) {
                       items.push(obj);
                     }
                   });
@@ -890,6 +984,31 @@ class DatabaseService {
       }
     }
     this.setLocalTable('data_siswa', normalizedList);
+
+    // Sinkronisasi sinkron ke Google Sheets jika integrasi dikonfigurasi
+    const appsScriptUrl = await this.getAppsScriptUrl();
+    const spreadsheetId = await this.getSpreadsheetId();
+    if (appsScriptUrl || spreadsheetId) {
+      const token = localStorage.getItem('google_oauth_token') || undefined;
+      await this.syncTableToGoogleSheets('data_siswa', token);
+    }
+  }
+
+  async deleteStudent(id: string): Promise<void> {
+    const list = this.getLocalTable<any>('data_siswa');
+    const filtered = list.filter(item => {
+      const norm = this.normalizeStudent(item);
+      return norm ? norm.id !== id : true;
+    });
+    this.setLocalTable('data_siswa', filtered);
+
+    // Sinkronisasi sinkron ke Google Sheets jika integrasi dikonfigurasi
+    const appsScriptUrl = await this.getAppsScriptUrl();
+    const spreadsheetId = await this.getSpreadsheetId();
+    if (appsScriptUrl || spreadsheetId) {
+      const token = localStorage.getItem('google_oauth_token') || undefined;
+      await this.syncTableToGoogleSheets('data_siswa', token);
+    }
   }
 
   // --- GRADE FUNCTIONS ---
@@ -921,10 +1040,10 @@ class DatabaseService {
     }
     this.setLocalTable('Nilai', list);
 
-    // Real-time integration: recalculate and save corresponding kelola_nilai record automatically!
-    if (grade.student_id && grade.semester && grade.kelas) {
-      await this.recalculateAndSaveKelolaNilaiForStudent(grade.student_id, String(grade.semester), String(grade.kelas));
-    }
+      // Real-time integration: recalculate and save corresponding nilai_rapot record automatically!
+      if (grade.student_id && grade.semester && grade.kelas) {
+        await this.recalculateAndSaveKelolaNilaiForStudent(grade.student_id, String(grade.semester), String(grade.kelas));
+      }
   }
 
   async recalculateAndSaveKelolaNilaiForStudent(studentId: string, semester: string, kelas: string): Promise<void> {
@@ -943,17 +1062,14 @@ class DatabaseService {
       );
 
       // 2. Fetch TPs, Assessments, and Weights
-      const savedTps = localStorage.getItem('pai_grades_tps');
-      const savedAsms = localStorage.getItem('pai_grades_assessments');
+      const tps = this.getLocalTable<any>('tujuan_pembelajaran');
+      const assessments = this.getLocalTable<any>('asesmen_tp');
       const savedWeights = localStorage.getItem('pai_grade_weights');
-
-      const tps = savedTps ? JSON.parse(savedTps) : [];
-      const assessments = savedAsms ? JSON.parse(savedAsms) : [];
       const weights = savedWeights ? JSON.parse(savedWeights) : { harian: 35, sts: 20, sas: 20, kehadiran: 10, sikap: 15 };
 
       // Filter active TPs for this grade & semester and sort starting from TP 1
       const currentClassTps = tps
-        .filter((t: any) => t.grade === studentGradeLevel && String(t.semester) === String(semester))
+        .filter((t: any) => String(t.grade) === String(studentGradeLevel) && String(t.semester) === String(semester))
         .sort((a: any, b: any) => {
           const codeA = String(a.code || '').toLowerCase();
           const codeB = String(b.code || '').toLowerCase();
@@ -1004,8 +1120,8 @@ class DatabaseService {
 
       const harianAvg = countHarian > 0 ? parseFloat((sumHarian / countHarian).toFixed(1)) : null;
 
-      // 5. Fetch existing kelola_nilai record to hold attitudes, katrol etc.
-      const kelolaList = this.getLocalTable<any>('kelola_nilai');
+      // 5. Fetch existing nilai_rapot record to hold attitudes, katrol etc.
+      const kelolaList = this.getLocalTable<any>('nilai_rapot');
       const overallKey = `${studentId}_${semester}`;
       const existingKelola = kelolaList.find(x => x.id === overallKey) || {};
 
@@ -1090,10 +1206,10 @@ class DatabaseService {
       } else {
         kelolaList.push(updatedRecord);
       }
-      this.setLocalTable('kelola_nilai', kelolaList);
+      this.setLocalTable('nilai_rapot', kelolaList);
 
     } catch (e) {
-      console.error("Gagal sinkronisasikan kelola_nilai secara otomatis:", e);
+      console.error("Gagal sinkronisasikan nilai_rapot secara otomatis:", e);
     }
   }
 
@@ -1166,11 +1282,11 @@ class DatabaseService {
 
   // --- KELOLA NILAI FUNCTIONS ---
   async getKelolaNilai(): Promise<any[]> {
-    return this.getLocalTable<any>('kelola_nilai');
+    return this.getLocalTable<any>('nilai_rapot');
   }
 
   async saveKelolaNilai(records: any[]): Promise<void> {
-    const list = this.getLocalTable<any>('kelola_nilai');
+    const list = this.getLocalTable<any>('nilai_rapot');
     
     for (const record of records) {
       const idx = list.findIndex(item => item.id === record.id);
@@ -1181,7 +1297,7 @@ class DatabaseService {
       }
     }
     
-    this.setLocalTable('kelola_nilai', list);
+    this.setLocalTable('nilai_rapot', list);
   }
 
   // --- RESET FUNCTIONS ---
@@ -1209,6 +1325,12 @@ class DatabaseService {
   async resetExamResults(): Promise<void> {
     this.setLocalTable('hasil_ujian', []);
   }
+  async resetTujuanPembelajaran(): Promise<void> {
+    this.setLocalTable('tujuan_pembelajaran', []);
+  }
+  async resetAsesmenTp(): Promise<void> {
+    this.setLocalTable('asesmen_tp', []);
+  }
   async resetAllData(): Promise<void> {
     await Promise.all([
       this.resetAttendance(),
@@ -1218,7 +1340,9 @@ class DatabaseService {
       this.resetMaterials(),
       this.resetExams(),
       this.resetQuestions(),
-      this.resetExamResults()
+      this.resetExamResults(),
+      this.resetTujuanPembelajaran(),
+      this.resetAsesmenTp()
     ]);
   }
 

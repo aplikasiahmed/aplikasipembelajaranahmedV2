@@ -10,6 +10,7 @@ import PublicTasks from './pages/PublicTasks';
 import PublicMaterials from './pages/PublicMaterials';
 import PublicExam from './pages/PublicExam';
 import TeacherDashboard from './pages/TeacherDashboard';
+import TeacherObjectives from './pages/TeacherObjectives';
 import TeacherInputGrades from './pages/TeacherInputGrades';
 import TeacherManageGrades from './pages/TeacherManageGrades';
 import TeacherInputAbsensi from './pages/TeacherInputAbsensi';
@@ -18,6 +19,9 @@ import TeacherTaskCheck from './pages/TeacherTaskCheck';
 import TeacherAdminManagement from './pages/TeacherAdminManagement';
 import TeacherExams from './pages/TeacherExams';
 import TeacherExamEditor from './pages/TeacherExamEditor';
+import TeacherSettings from './pages/TeacherSettings';
+import TeacherWeightSettings from './pages/TeacherWeightSettings';
+import TeacherStudents from './pages/TeacherStudents';
 import { db } from './services/supabaseMock';
 
 // Higher Order Component for Route Protection
@@ -78,6 +82,21 @@ const App: React.FC = () => {
               <TeacherDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/guru/tujuanpembelajaran" element={
+            <ProtectedRoute>
+              <TeacherObjectives />
+            </ProtectedRoute>
+          } />
+          <Route path="/guru/bobotnilai" element={
+            <ProtectedRoute>
+              <TeacherWeightSettings />
+            </ProtectedRoute>
+          } />
+          <Route path="/guru/datasiswa" element={
+            <ProtectedRoute>
+              <TeacherStudents />
+            </ProtectedRoute>
+          } />
           {/* Route Baru: Bank Soal & Editor */}
           <Route path="/guru/ujian" element={
             <ProtectedRoute>
@@ -95,7 +114,7 @@ const App: React.FC = () => {
               <TeacherInputGrades />
             </ProtectedRoute>
           } />
-          <Route path="/guru/kelola-nilai" element={
+          <Route path="/guru/Nilai-rapot" element={
             <ProtectedRoute>
               <TeacherManageGrades />
             </ProtectedRoute>
@@ -118,6 +137,11 @@ const App: React.FC = () => {
           <Route path="/guru/admin" element={
             <ProtectedRoute>
               <TeacherAdminManagement />
+            </ProtectedRoute>
+          } />
+          <Route path="/guru/pengaturan" element={
+            <ProtectedRoute>
+              <TeacherSettings />
             </ProtectedRoute>
           } />
           

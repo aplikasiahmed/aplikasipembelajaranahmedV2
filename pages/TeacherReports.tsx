@@ -128,110 +128,234 @@ const TeacherReports: React.FC = () => {
     }
   };
 
-  // --- HELPER: TRANSFORM DATA NILAI KE PIVOT (KOLOM DINAMIS & LOGIKA HIDE) ---
-  const transformGradesToPivot = (data: any[]) => {
-      // 0. Sort data secara Kronologis (Terlama ke Terbaru) agar H-1, TO-1 adalah yang pertama
-      data.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  // --- HELPER: GET DYNAMIC GRADE REPORT DATA (CONFORMING TO LEARNING OBJECTIVES) ---
+  const getDynamicGradeReportData = async (targetKelas: string, targetSem: string): Promise<any[]> => {
+    // 1. Fetch students in the classroom
+    const students = await db.getStudentsByKelas(targetKelas);
+    if (!students || students.length === 0) return [];
 
-      // 1. Grouping by Student
-      const studentsMap = new Map<string, any>();
+    // 2. Load TP and Assessments
+    const tpsList = db.getLocalTable<any>('tujuan_pembelajaran');
+    const assessmentsList = db.getLocalTable<any>('asesmen_tp');
+
+    const savedTpScores = localStorage.getItem('pai_grades_tp_scores');
+    const tpScores: Record<string, number> = savedTpScores ? JSON.parse(savedTpScores) : {};
+
+    const savedOveralls = localStorage.getItem('pai_grades_overalls');
+    const overalls: Record<string, any> = savedOveralls ? JSON.parse(savedOveralls) : {};
+
+    const savedWeights = localStorage.getItem('pai_grade_weights');
+    const weights = savedWeights ? JSON.parse(savedWeights) : { harian: 35, sts: 20, sas: 20, kehadiran: 10, sikap: 15 };
+
+    // Get grade level from target class, e.g. "7"
+    const match = targetKelas.match(/\d+/);
+    const gradeLevel = match ? match[0] : '7';
+
+    // Find active TPs
+    const activeTps = tpsList
+      .filter((t: any) => String(t.grade) === String(gradeLevel) && String(t.semester) === String(targetSem))
+      .sort((a: any, b: any) => {
+        const codeA = String(a.code || '').toLowerCase();
+        const codeB = String(b.code || '').toLowerCase();
+        return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+    // Helper functions for scoring
+    const calculateStudentTpScore = (studentId: string, tpId: string): number | null => {
+      const relatedAsms = assessmentsList.filter((a: any) => a.tpId === tpId);
+      if (relatedAsms.length === 0) return null;
+
+      let sum = 0;
+      let count = 0;
+      relatedAsms.forEach((asm: any) => {
+        const scoreKey = `${studentId}_${asm.id}`;
+        const scoreVal = tpScores[scoreKey];
+        if (scoreVal !== undefined && scoreVal !== null && scoreVal !== '') {
+          sum += Number(scoreVal);
+          count++;
+        }
+      });
+      return count > 0 ? parseFloat((sum / count).toFixed(1)) : null;
+    };
+
+    const calculateStudentNilaiHarian = (studentId: string): number | null => {
+      if (activeTps.length === 0) return null;
+      let sum = 0;
+      let count = 0;
+      activeTps.forEach((tp: any) => {
+        const tpScore = calculateStudentTpScore(studentId, tp.id);
+        if (tpScore !== null) {
+          sum += tpScore;
+          count++;
+        }
+      });
+      return count > 0 ? parseFloat((sum / count).toFixed(1)) : null;
+    };
+
+    const getAttendanceScore = (sakit: number = 0, izin: number = 0, alpha: number = 0): number => {
+      const deduction = (sakit * 1) + (izin * 2) + (alpha * 5);
+      return Math.max(0, 100 - deduction);
+    };
+
+    const getAttitudeScore = (sikapStr: string, nhScore: number | null): number => {
+      if (sikapStr === 'Sangat Baik') return 95;
+      if (sikapStr === 'Baik') return 85;
+      if (sikapStr === 'Cukup') return 75;
+      if (sikapStr === 'Perlu Bimbingan') return 60;
+      return nhScore !== null ? Math.round(nhScore) : 85;
+    };
+
+    const calculateStudentNilaiAkhir = (studentId: string) => {
+      const harian = calculateStudentNilaiHarian(studentId);
+      const overallKey = `${studentId}_${targetSem}`;
+      const overallRecord = overalls[overallKey];
       
-      // Flags global untuk mendeteksi ketersediaan data dalam 1 kelas
-      let maxHarianCount = 0;
-      let maxTOCount = 0; // NEW: Hitung jumlah maksimal TO
-      let existUTS = false;
-      let existUAS = false;
-      let existPraktik = false;
+      const sts = overallRecord && overallRecord.sts !== '' ? Number(overallRecord.sts) : 0;
+      const sas = overallRecord && overallRecord.sas !== '' ? Number(overallRecord.sas) : 0;
 
-      data.forEach(item => {
-          const sid = item.student_id;
-          if (!studentsMap.has(sid)) {
-              studentsMap.set(sid, {
-                  nis: item.data_siswa?.nis || '-',
-                  nama: item.data_siswa?.namalengkap || 'Siswa',
-                  harian: [],
-                  uts: null,
-                  uas: null,
-                  praktik: null,
-                  to: [] // NEW: Ubah TO menjadi array untuk menampung banyak nilai
-              });
-          }
+      const sakit = overallRecord?.kehadiran?.sakit || 0;
+      const izin = overallRecord?.kehadiran?.izin || 0;
+      const alpha = overallRecord?.kehadiran?.alpha || 0;
+      const kehadiranScore = getAttendanceScore(sakit, izin, alpha);
 
-          const s = studentsMap.get(sid);
-          const type = item.subject_type ? item.subject_type.toLowerCase().trim() : '';
+      const sikapStr = overallRecord?.sikap || '';
+      const sikapScore = getAttitudeScore(sikapStr, harian);
 
-          if (type === 'harian' || type === 'uh') {
-              s.harian.push(item.score);
-              if (s.harian.length > maxHarianCount) maxHarianCount = s.harian.length;
-          } else if (type === 'uts' || type === 'pts') {
-              s.uts = item.score;
-              existUTS = true;
-          } else if (type === 'uas' || type === 'pas') {
-              s.uas = item.score;
-              existUAS = true;
-          } else if (type === 'pts') {
-              s.praktik = item.score;
-              existPraktik = true;
-          } else if (type === 'tugas online' || type === 'ujian online') {
-              // REVISI: Masukkan ke array TO
-              s.to.push(item.score);
-              if (s.to.length > maxTOCount) maxTOCount = s.to.length;
-          }
+      if (harian === null) {
+        return { 
+          harian: null, 
+          sts, 
+          sas, 
+          kehadiranScore,
+          sikapScore,
+          finalScore: null 
+        };
+      }
+
+      const wHarian = (weights.harian ?? 35) / 100;
+      const wSts = (weights.sts ?? 20) / 100;
+      const wSas = (weights.sas ?? 20) / 100;
+      const wKehadiran = (weights.kehadiran ?? 10) / 100;
+      const wSikap = (weights.sikap ?? 15) / 100;
+
+      const result = 
+        (harian * wHarian) + 
+        (sts * wSts) + 
+        (sas * wSas) + 
+        (kehadiranScore * wKehadiran) + 
+        (sikapScore * wSikap);
+
+      const katrol = overallRecord && overallRecord.katrol !== '' && overallRecord.katrol !== undefined ? Number(overallRecord.katrol) : 0;
+      const finalCalculated = Math.round(result) + katrol;
+      const finalScore = Math.min(100, Math.max(0, finalCalculated));
+
+      return {
+        harian,
+        sts,
+        sas,
+        kehadiranScore,
+        sikapScore,
+        finalScore
+      };
+    };
+
+    const getAttitudeTextFromScore = (score: number | null): string => {
+      if (score === null) return '-';
+      if (score >= 91) return 'Sangat Baik';
+      if (score >= 81) return 'Baik';
+      if (score >= 71) return 'Cukup';
+      return 'Perlu Bimbingan';
+    };
+
+    const getPredicateAndDesc = (score: number | null, studentId: string): { pred: string; desc: string } => {
+      if (score === null) return { pred: '-', desc: '-' };
+      let pred = 'D';
+      if (score >= 91) pred = 'A';
+      else if (score >= 81) pred = 'B';
+      else if (score >= 71) pred = 'C';
+
+      const fallbackDesc: Record<string, string> = {
+        'A': 'Menunjukkan penguasaan materi yang sangat baik pada seluruh tujuan pembelajaran.',
+        'B': 'Menunjukkan penguasaan materi yang baik pada sebagian besar tujuan pembelajaran.',
+        'C': 'Menunjukkan penguasaan materi yang cukup dan perlu peningkatan pada beberapa tujuan pembelajaran.',
+        'D': 'Memerlukan pendampingan dan penguatan meningkatkan kompetensi tujuan pembelajaran.'
+      };
+
+      if (!studentId || activeTps.length === 0) {
+        return { pred, desc: fallbackDesc[pred] };
+      }
+
+      const tpEvaluations = activeTps
+        .map(tp => {
+          const val = calculateStudentTpScore(studentId, tp.id);
+          return { tp, score: val };
+        })
+        .filter((item): item is { tp: any, score: number } => item.score !== null);
+
+      if (tpEvaluations.length === 0) {
+        return { pred, desc: fallbackDesc[pred] };
+      }
+
+      tpEvaluations.sort((a, b) => b.score - a.score);
+      const maxEval = tpEvaluations[0];
+      const minEval = tpEvaluations[tpEvaluations.length - 1];
+
+      let desc = '';
+      if (maxEval.score >= 75) {
+        desc += `Sangat memahami ${maxEval.tp.name || maxEval.tp.description}`;
+      } else {
+        desc += `Cukup memahami ${maxEval.tp.name || maxEval.tp.description}`;
+      }
+
+      if (minEval && minEval.tp.id !== maxEval.tp.id && minEval.score < 80) {
+        desc += `, namun masih perlu bimbingan/peningkatan dalam hal ${minEval.tp.name || minEval.tp.description}.`;
+      } else {
+        desc += `, serta konsisten menunjukkan penguasaan yang baik pada seluruh indikator lainnya.`;
+      }
+
+      return { pred, desc };
+    };
+
+    const rows = students.map((s, idx) => {
+      const studentId = s.id!;
+      const calculs = calculateStudentNilaiAkhir(studentId);
+      const predObj = getPredicateAndDesc(calculs.finalScore, studentId);
+      const overallKey = `${studentId}_${targetSem}`;
+      const over = overalls[overallKey];
+
+      const rowValue: any = {
+        'NO': idx + 1,
+        'NIS': s.nis || '-',
+        'NAMA SISWA': s.namalengkap || '-'
+      };
+
+      // Add each active TP score dynamically
+      activeTps.forEach((tp: any) => {
+        const score = calculateStudentTpScore(studentId, tp.id);
+        rowValue[tp.code || `TP ${tp.id}`] = score !== null ? score : '-';
       });
 
-      // 2. Build Final Array
-      const result = Array.from(studentsMap.values()).map((s, idx) => {
-          // Hitung Rata-rata
-          let totalScore = 0;
-          let count = 0;
-          
-          s.harian.forEach((h: number) => { totalScore += h; count++; });
-          
-          // Hitung Rata-rata dari Array TO juga
-          s.to.forEach((t: number) => { totalScore += t; count++; });
-          
-          if (s.praktik !== null) { totalScore += s.praktik; count++; }
-          if (s.uts !== null) { totalScore += s.uts; count++; }
-          if (s.uas !== null) { totalScore += s.uas; count++; }
+      rowValue['RATA HARIAN'] = calculs.harian !== null ? calculs.harian : '-';
+      rowValue['STS'] = over && over.sts !== '' ? over.sts : '-';
+      rowValue['SAS'] = over && over.sas !== '' ? over.sas : '-';
+      rowValue['NILAI AKHIR'] = calculs.finalScore !== null ? calculs.finalScore : '-';
+      rowValue['PREDIKAT'] = predObj.pred;
+      rowValue['DESKRIPSI PENGUASAAN MATERI'] = predObj.desc;
+      rowValue['SIKAP'] = over && over.sikap ? over.sikap : getAttitudeTextFromScore(calculs.sikapScore);
+      rowValue['S'] = over && over.kehadiran?.sakit ? over.kehadiran.sakit : 0;
+      rowValue['I'] = over && over.kehadiran?.izin ? over.kehadiran.izin : 0;
+      rowValue['A'] = over && over.kehadiran?.alpha ? over.kehadiran.alpha : 0;
 
-          const average = count > 0 ? (totalScore / count).toFixed(1) : '0';
+      return rowValue;
+    });
 
-          // Base Object
-          const row: any = {
-              'NO': idx + 1,
-              'NIS': s.nis,
-              'NAMA SISWA': s.nama
-          };
+    // Sort students A-Z by name
+    const sorted = rows.sort((a, b) => a['NAMA SISWA'].localeCompare(b['NAMA SISWA']));
+    sorted.forEach((row, index) => {
+      row['NO'] = index + 1;
+    });
 
-          // Dynamic Harian Columns 'H-1'
-          for (let i = 0; i < maxHarianCount; i++) {
-              row[`H-${i + 1}`] = s.harian[i] !== undefined ? s.harian[i] : '';
-          }
-
-          // REVISI: Dynamic TO Columns (TO-1, TO-2, dst)
-          if (maxTOCount === 1) {
-              // Jika cuma ada 1 TO di seluruh kelas, namakan 'TO' saja agar simpel (opsional, bisa juga TO-1)
-              row['TO'] = s.to[0] !== undefined ? s.to[0] : '';
-          } else if (maxTOCount > 1) {
-              // Jika lebih dari 1, buat TO-1, TO-2, dst
-              for (let i = 0; i < maxTOCount; i++) {
-                  row[`TO-${i + 1}`] = s.to[i] !== undefined ? s.to[i] : '';
-              }
-          }
-
-          // Column Lain
-          if (existPraktik) row['PRAKTIK'] = s.praktik !== null ? s.praktik : '';
-          if (existUTS) row['PTS'] = s.uts !== null ? s.uts : '';
-          if (existUAS) row['PAS'] = s.uas !== null ? s.uas : '';
-          
-          // REVISI FINAL: Ganti 'RATA-RATA' menjadi 'RATA2'
-          row['RATA2'] = average;
-
-          return row;
-      });
-
-      // 3. SORTING ABJAD (A-Z)
-      return result.sort((a: any, b: any) => a['NAMA SISWA'].localeCompare(b['NAMA SISWA']));
+    return sorted;
   };
 
   // --- SINGLE EXPORT (PER KELAS) ---
@@ -255,31 +379,20 @@ const TeacherReports: React.FC = () => {
 
     try {
       if (category === 'nilai') {
-        // Ambil Raw Data
-        let rawData = await db.getGradesByKelas(targetKelas, targetSem);
-        
-        // Filter by Tipe Nilai (Jika user memilih filter, walau defaultnya Semua)
-        if (tipeNilai) {
-            rawData = rawData.filter(item => item.subject_type === tipeNilai);
-        }
+        const pivotedData = await getDynamicGradeReportData(targetKelas, targetSem);
 
-        if (!rawData || rawData.length === 0) {
+        if (!pivotedData || pivotedData.length === 0) {
           Swal.close();
           setTimeout(() => {
             Swal.fire({
               icon: 'info',
               title: 'Kosong',
-              text: `Data nilai Semester ${targetSem} belum tersedia.`,
+              text: `Data nilai Kelas ${targetKelas} Semester ${targetSem} belum tersedia.`,
               heightAuto: false
             });
           }, 150);
           return;
         }
-
-        // TRANSFORM DATA MENJADI PIVOT (KOLOM DINAMIS)
-        const pivotedData = transformGradesToPivot(rawData);
-        // RE-NUMBERING 'NO' AFTER SORTING
-        pivotedData.forEach((row: any, index: number) => { row['NO'] = index + 1; });
 
         const titleLabel = 'LAPORAN NILAI SISWA';
 
@@ -292,7 +405,7 @@ const TeacherReports: React.FC = () => {
               title: titleLabel,
               kelas: targetKelas,
               semester: targetSem === '1' ? '1 (Ganjil)' : '2 (Genap)',
-              type: 'nilai' // Menandakan ini laporan nilai untuk memunculkan keterangan H, TO, dll
+              type: 'nilai' // Menandakan ini laporan nilai untuk memunculkan keterangan
             }
           );
           Swal.close();
@@ -410,18 +523,9 @@ const TeacherReports: React.FC = () => {
         // Loop semua kelas
         for (const kelas of availKelas) {
             if (category === 'nilai') {
-                let rawData = await db.getGradesByKelas(kelas, targetSem);
+                const pivotedData = await getDynamicGradeReportData(kelas, targetSem);
                 
-                if (tipeNilai) {
-                    rawData = rawData.filter(item => item.subject_type === tipeNilai);
-                }
-
-                if (rawData && rawData.length > 0) {
-                    // TRANSFORM PIVOT UNTUK BATCH JUGA (Sorting sudah include)
-                    const pivotedData = transformGradesToPivot(rawData);
-                    // Re-numbering
-                    pivotedData.forEach((row: any, index: number) => { row['NO'] = index + 1; });
-                    
+                if (pivotedData && pivotedData.length > 0) {
                     batchData.push({
                         data: pivotedData,
                         sheetName: kelas,
@@ -690,12 +794,17 @@ const TeacherReports: React.FC = () => {
       {/* Header Responsif */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white/50 backdrop-blur-sm p-3 md:p-0 rounded-2xl md:bg-transparent">
         <div className="flex-1">
-          <button onClick={() => navigate('/guru')} className="flex items-center gap-1.5 text-slate-800 text-[10px] font-black uppercase py-2 hover:translate-x-[-4px] transition-transform">
-            <ArrowLeft size={14} /> Dashboard Utama
+          <button 
+            onClick={() => navigate('/guru')} 
+            className="group flex items-center gap-2 text-slate-700 hover:text-emerald-700 transition-all text-xs font-black uppercase tracking-wider mb-2"
+            id="btn-back-to-dashboard-utama"
+          >
+            <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" />
+            <span>DASHBOARD UTAMA</span>
           </button>
-          <h1 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-slate-800 leading-tight">Laporan & Database</h1>
+          <h1 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-slate-800 leading-tight">Laporan Nilai</h1>
           <p className="text-slate-500 text-[10px] md:text-sm font-medium leading-tight md:leading-normal max-w-lg">
-            Panel Pengelolaan Laporan dan Database PAI.
+            Panel Pengelolaan Laporan Nilai PAI.
           </p>
         </div>
         <div className="bg-red-600 text-white p-2.5 rounded-xl md:rounded-2xl shadow-lg flex items-center gap-3 self-start md:self-center">
@@ -861,89 +970,8 @@ const TeacherReports: React.FC = () => {
                 *Rekap kehadiran seluruh kelas sesuai rentang bulan.
              </p>
           </div>
-        </div>
-
-        {/* IMPORT SISWA */}
-        <div className="bg-white p-4 md:p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl"><FileUp size={18}/></div>
-            <h2 className="text-[11px] md:text-sm font-black uppercase tracking-widest text-slate-800">Kelola & Import Siswa</h2>
-          </div>
-
-          {/* PETUNJUK GOOGLE SHEETS */}
-          <div className="p-4 bg-emerald-50/70 border border-emerald-100 rounded-2xl space-y-2">
-            <h3 className="text-[10px] font-black text-emerald-850 uppercase tracking-wider flex items-center gap-1">
-              💡 Cara Memasukkan 500 Siswa Via Google Sheets
-            </h3>
-            <ol className="list-decimal list-inside text-[9px] md:text-xs text-slate-600 space-y-1 leading-normal">
-              <li>Buka file Google Spreadsheet Anda, aktifkan tab <strong>"data_siswa"</strong>.</li>
-              <li>Tulis / Paste data 500+ siswa Anda secara sekaligus ke kolom yang tersedia:
-                <div className="mt-1 flex flex-wrap gap-1 font-mono text-[8px] md:text-[10px] text-emerald-800 bg-white/80 p-1 md:p-2 rounded-lg border border-emerald-100">
-                  <span>id</span> | <span>nis</span> | <span>namalengkap</span> | <span>kelas</span> | <span>jeniskelamin</span>
-                </div>
-                <span className="text-[8px] text-slate-400 block mt-0.5">*Catatan: Isi <code className="bg-slate-100 px-0.5 py-0.2 rounded text-[7px]">jeniskelamin</code> dengan <strong className="text-slate-600">L</strong> (Laki-laki) atau <strong className="text-slate-600">P</strong> (Perempuan)</span>
-              </li>
-              <li>Setelah data terisi lengkap di spreadsheet, klik tombol <strong>"Tarik Data dari Google Sheets"</strong> di bawah ini untuk memuatnya secara instan ke web portal!</li>
-            </ol>
-          </div>
-
-          <div className="space-y-2.5">
-            {appsScriptUrl ? (
-              <button 
-                onClick={handleSyncFromSheets} 
-                disabled={syncing}
-                className="w-full p-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 hover:bg-emerald-500 transition-all"
-              >
-                <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
-                {syncing ? 'Sedang Mensinkronkan...' : 'Tarik Data dari Google Sheets'}
-              </button>
-            ) : (
-              <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-[9px] text-amber-700 leading-tight">
-                Hubungkan Web App URL Google Apps Script Anda di menu Kelola Admin terlebih dahulu untuk mengaktifkan fitur penarikan data langsung dari Google Sheets.
-              </div>
-            )}
-
-            <div className="relative flex items-center my-2">
-              <div className="flex-grow border-t border-slate-100"></div>
-              <span className="flex-shrink mx-3 text-[8px] font-black text-slate-300 uppercase tracking-widest">Atau via Offline Excel</span>
-              <div className="flex-grow border-t border-slate-100"></div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <button onClick={downloadTemplate} className="w-full p-2.5 bg-slate-100 text-slate-800 rounded-2xl text-[9px] font-black uppercase flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"><Download size={14}/> Template Excel</button>
-              <div className="relative">
-                <input type="file" ref={fileInputRef} onChange={handleImportExcel} accept=".xlsx, .xls" className="hidden" />
-                <button onClick={() => fileInputRef.current?.click()} className="w-full p-2.5 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase flex items-center justify-center gap-1.5 shadow-md hover:bg-blue-500 active:scale-95 transition-all"><Upload size={14}/> Upload Excel</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* RESET DATA */}
-        <div className="bg-white p-4 md:p-6 rounded-[2rem] border border-red-100 border-dashed shadow-sm space-y-3 md:space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-50 text-red-600 rounded-xl"><ShieldAlert size={18}/></div>
-            <h2 className="text-[11px] md:text-sm font-black uppercase tracking-widest text-red-600">Reset Database</h2>
-          </div>
-          <div className="flex items-start gap-2 px-3 py-2 bg-red-50/50 rounded-xl border border-red-100">
-            <AlertTriangle size={14} className="text-red-600 mt-0.5 shrink-0" />
-            <p className="text-[8px] font-bold text-red-700 uppercase italic">Membutuhkan Token Keamanan PAI.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => secureReset('siswa')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Data Siswa</button>
-            <button onClick={() => secureReset('absensi')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Absensi</button>
-            <button onClick={() => secureReset('nilai')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Nilai</button>
-            <button onClick={() => secureReset('tugas')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Tugas</button>
-            <button onClick={() => secureReset('materi')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Materi Belajar</button>
-            <button onClick={() => secureReset('ujian')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Ujian</button>
-            <button onClick={() => secureReset('bank_soal')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Bank Soal</button>
-            <button onClick={() => secureReset('hasil_ujian')} className="p-2.5 bg-slate-800 text-white rounded-xl text-[8px] font-black uppercase active:scale-95 transition-all">Reset Hasil Ujian</button>
-            <button onClick={() => secureReset('semua')} className="p-3.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase col-span-2 shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
-              <Trash2 size={16}/> Hapus Seluruh Data
-            </button>
-          </div>
-        </div>
-      </div>
+       </div>
+     </div>
     </div>
   );
 };

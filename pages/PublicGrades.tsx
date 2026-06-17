@@ -53,7 +53,7 @@ const PublicGrades: React.FC = () => {
         const studentGrades = await db.getGradesByStudent(found.id!);
         setAllGrades(studentGrades);
 
-        // 2. Ambil data Kelola Nilai dari table "kelola_nilai" untuk pencocokan real-time
+        // 2. Ambil data Nilai Rapot dari table "nilai_rapot" untuk pencocokan real-time
         const kList = await db.getKelolaNilai();
         const studentKelola = kList.filter(item => String(item.student_id) === String(found.id));
         setAllKelolaRecords(studentKelola);
@@ -95,14 +95,13 @@ const PublicGrades: React.FC = () => {
   // --- DYNAMIC CALCULATIONS & INTEGRATION WITH SPREADSHEET/LEDGER MODE ---
   const kelolaRecord = allKelolaRecords.find(item => String(item.semester) === String(semester));
 
-  // Ambil state ledger PAI dari localStorage yang sinkron dengan guru
-  const savedTps = localStorage.getItem('pai_grades_tps');
-  const savedAsms = localStorage.getItem('pai_grades_assessments');
+  // Ambil state ledger PAI dari localStorage/DB yang sinkron dengan guru
+  const localTps = db.getLocalTable<any>('tujuan_pembelajaran');
+  const localAsms = db.getLocalTable<any>('asesmen_tp');
+  
   const savedTpScores = localStorage.getItem('pai_grades_tp_scores');
   const savedWeights = localStorage.getItem('pai_grade_weights');
 
-  const localTps = savedTps ? JSON.parse(savedTps) : [];
-  const localAsms = savedAsms ? JSON.parse(savedAsms) : [];
   const localTpScores = savedTpScores ? JSON.parse(savedTpScores) : {};
   const localWeights = savedWeights ? JSON.parse(savedWeights) : { harian: 35, sts: 20, sas: 20, kehadiran: 10, sikap: 15 };
 
@@ -116,7 +115,7 @@ const PublicGrades: React.FC = () => {
 
   const studentGradeLevel = student?.kelas ? String(student.kelas).trim().charAt(0) : '7';
 
-  // Helper resolve details dari penilaian / tugas guru yang diambil dari JENIS PENILAIAN pada kelola-nilai
+  // Helper resolve details dari penilaian / tugas guru yang diambil dari JENIS PENILAIAN pada nilai-rapot
   const resolveAssignmentDetails = (g: GradeRecord) => {
     if (g.subject_type === 'harian' || g.subject_type === 'praktik') {
       const asm = localAsms.find((a: any) => String(a.id) === String(g.description));
@@ -139,7 +138,7 @@ const PublicGrades: React.FC = () => {
 
   // Filter TPs yang sesuai dengan level kelas dan semester siswa saat ini dan diurutkan dari TP 1
   const currentClassTps = localTps
-    .filter((t: any) => t.grade === studentGradeLevel && String(t.semester) === String(semester))
+    .filter((t: any) => String(t.grade) === String(studentGradeLevel) && String(t.semester) === String(semester))
     .sort((a: any, b: any) => {
       const codeA = String(a.code || '').toLowerCase();
       const codeB = String(b.code || '').toLowerCase();
