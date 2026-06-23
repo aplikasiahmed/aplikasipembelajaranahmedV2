@@ -12,10 +12,16 @@ import {
   GraduationCap,
   ArrowLeft,
   Bookmark,
-  Share2
+  Share2,
+  CheckCircle,
+  Clock,
+  Sparkles,
+  BookMarked,
+  RotateCcw
 } from 'lucide-react';
 import { db } from '../services/supabaseMock';
 import { Material, GradeLevel } from '../types';
+import Swal from 'sweetalert2';
 
 interface TP {
   id: string;
@@ -47,6 +53,41 @@ const PublicMaterials: React.FC = () => {
 
   // Reader Modal State
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+
+  // List of material IDs that are completed
+  const [completedReadIds, setCompletedReadIds] = useState<string[]>([]);
+  // Reader Font Size (px)
+  const [readerFontSize, setReaderFontSize] = useState<number>(16);
+
+  // Load completed read list from local storage on mount
+  useEffect(() => {
+    const listStr = localStorage.getItem('pai_completed_read_materials');
+    if (listStr) {
+      try {
+        setCompletedReadIds(JSON.parse(listStr));
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+  }, []);
+
+  const handleMarkAsCompleted = (id: string) => {
+    let updated = [...completedReadIds];
+    if (!updated.includes(id)) {
+      updated.push(id);
+      setCompletedReadIds(updated);
+      localStorage.setItem('pai_completed_read_materials', JSON.stringify(updated));
+      
+      Swal.fire({
+        title: 'Alhamdulillah! 🎉',
+        text: 'Kamu telah menyelesaikan membaca materi ini. Semoga menjadi ilmu yang bermanfaat dan berkah!',
+        icon: 'success',
+        confirmButtonText: 'Aamiin Yaa Rabbal \'Alamiin',
+        confirmButtonColor: '#047857',
+        heightAuto: false
+      });
+    }
+  };
 
   // --- LOAD DATA ---
   useEffect(() => {
@@ -172,33 +213,35 @@ const PublicMaterials: React.FC = () => {
               </div>
             </div>
 
-            {/* Grade Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-50">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-2">Pilih Jenjang:</span>
-              <button
-                onClick={() => setActiveGradeTab('Semua')}
-                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                  activeGradeTab === 'Semua'
-                    ? 'bg-emerald-700 text-white shadow-md shadow-emerald-50'
-                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                Semua Kelas
-              </button>
-              {['7', '8', '9'].map(gr => (
+            {/* Grade Tabs - Scrollable on Mobile for professional layout */}
+            <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-50">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Pilih Jenjang Kelas:</span>
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 scrollbar-none -mx-2 px-2">
                 <button
-                  key={gr}
-                  onClick={() => setActiveGradeTab(gr)}
-                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${
-                    activeGradeTab === gr
+                  onClick={() => setActiveGradeTab('Semua')}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${
+                    activeGradeTab === 'Semua'
                       ? 'bg-emerald-700 text-white shadow-md shadow-emerald-50'
                       : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  <GraduationCap size={14} />
-                  Kelas {gr === '7' ? 'VII' : gr === '8' ? 'VIII' : 'IX'}
+                  Semua Kelas
                 </button>
-              ))}
+                {['7', '8', '9'].map(gr => (
+                  <button
+                    key={gr}
+                    onClick={() => setActiveGradeTab(gr)}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0 ${
+                      activeGradeTab === gr
+                        ? 'bg-emerald-700 text-white shadow-md shadow-emerald-50'
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <GraduationCap size={14} />
+                    Kelas {gr === '7' ? 'VII' : gr === '8' ? 'VIII' : 'IX'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -209,17 +252,20 @@ const PublicMaterials: React.FC = () => {
                 <BookOpen size={48} className="text-slate-300 mx-auto" />
                 <h3 className="text-sm font-black text-slate-700">Materi Tidak Ditemukan</h3>
                 <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                  Silakan ganti kata kunci atau pilih tab filter kelas & kategori yang lain.
+                  Silakan ganti kata kunci atau pilih tab filter kelas yang lain.
                 </p>
               </div>
             ) : (
               displayMaterials.map((mat) => {
                 const matchedTp = tps.find(t => String(t.id) === String(mat.tp_id));
+                const isCompleted = completedReadIds.includes(mat.id);
 
                 return (
                   <div 
                     key={mat.id} 
-                    className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col justify-between group hover:shadow-md transition-all duration-300 cursor-pointer"
+                    className={`bg-white rounded-[2rem] border shadow-sm overflow-hidden flex flex-col justify-between group hover:shadow-md transition-all duration-300 cursor-pointer relative ${
+                      isCompleted ? 'border-emerald-200 bg-emerald-50/5' : 'border-slate-100'
+                    }`}
                     onClick={() => setSelectedMaterial(mat)}
                   >
                     <div>
@@ -238,12 +284,26 @@ const PublicMaterials: React.FC = () => {
                             <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Pelajaran PAI</span>
                           </div>
                         )}
+
+                        {/* Top Left Category Badge */}
                         <span className="absolute left-4 top-4 bg-emerald-700 text-white font-black text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md">
                           {mat.category}
                         </span>
+
+                        {/* Top Right Semester Badge */}
                         <span className="absolute right-4 top-4 bg-white/95 text-slate-800 font-extrabold text-[9px] px-2.5 py-1 rounded-full shadow-md">
                           Semester {mat.semester || '1'}
                         </span>
+
+                        {/* Gamified Completed Badge */}
+                        {isCompleted && (
+                          <div className="absolute inset-0 bg-emerald-950/40 backdrop-blur-[1px] flex items-center justify-center transition-opacity">
+                            <span className="bg-emerald-600 text-white font-black text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-lg scale-100 animate-pulse">
+                              <CheckCircle size={14} />
+                              Selesai Dibaca
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Info Body */}
@@ -255,6 +315,12 @@ const PublicMaterials: React.FC = () => {
                           <span className="bg-indigo-50 text-indigo-800 font-extrabold text-[9px] px-2 py-0.5 rounded-lg border border-indigo-100">
                             {mat.kelas || 'Semua Kelas'}
                           </span>
+                          {isCompleted && (
+                            <span className="bg-amber-50 text-amber-800 font-black text-[9px] px-2 py-0.5 rounded-lg border border-amber-100 flex items-center gap-0.5 animate-pulse">
+                              <Sparkles size={8} />
+                              Materi Dikuasai
+                            </span>
+                          )}
                         </div>
 
                         <div>
@@ -296,153 +362,224 @@ const PublicMaterials: React.FC = () => {
         </>
       )}
 
-      {/* --- RECONSTRUCTED FULL-SCREEN READER MODAL --- */}
-      {selectedMaterial && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
-          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-100 animate-slideUp">
-            
-            {/* Modal Header Bar */}
-            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="bg-emerald-700 text-white font-extrabold text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider">
-                  {selectedMaterial.category}
-                </span>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                  Kelas {selectedMaterial.grade} &bull; Semester {selectedMaterial.semester || '1'}
-                </span>
-              </div>
-              <button 
-                onClick={() => setSelectedMaterial(null)}
-                className="p-1.5 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded-full transition-all"
-                title="Tutup Membaca"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      {/* --- PREMIUM COMPREHENSIVE READER MODAL (FULL SCREEN MOBILE) --- */}
+      {selectedMaterial && (() => {
+        const wordCount = selectedMaterial.text_content?.split(/\s+/).length || 0;
+        const readTime = Math.max(1, Math.ceil(wordCount / 150)); // ~150 words per min for students
+        const isCompleted = completedReadIds.includes(selectedMaterial.id);
 
-            {/* Modal Scrollable Reader Content */}
-            <div className="flex-1 p-6 sm:p-8 overflow-y-auto space-y-6">
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 md:p-6 overflow-y-auto animate-fadeIn">
+            <div className="bg-white w-full h-full sm:h-auto sm:max-h-[92vh] sm:max-w-4xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-100 animate-slideUp">
               
-              {/* Banner & Title */}
-              <div className="space-y-4">
-                <h1 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight leading-tight">
-                  {selectedMaterial.title}
-                </h1>
-                
-                {/* Deskripsi ringkas */}
-                <p className="text-xs sm:text-sm text-slate-500 font-medium leading-relaxed italic bg-emerald-50/40 p-4 rounded-2xl border-l-4 border-emerald-600">
-                  {selectedMaterial.description}
-                </p>
-              </div>
-
-              {/* Grid: Image and TP Information */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
-                {/* Image Illustration */}
-                <div className="md:col-span-2 h-48 sm:h-64 rounded-2xl overflow-hidden border border-slate-100 shadow-sm relative shrink-0">
-                  {selectedMaterial.thumbnail ? (
-                    <img 
-                      referrerPolicy="no-referrer" 
-                      src={selectedMaterial.thumbnail} 
-                      alt={selectedMaterial.title} 
-                      className="w-full h-full object-cover" 
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-slate-50 flex flex-col items-center justify-center text-slate-300 gap-2">
-                      <BookOpen size={48} />
-                      <span className="text-[10px] font-black uppercase text-slate-400">Dokumentasi Pembelajaran</span>
-                    </div>
-                  )}
+              {/* Modal Header Bar */}
+              <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="bg-emerald-700 text-white font-extrabold text-[9px] px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    {selectedMaterial.category}
+                  </span>
+                  <span className="hidden xs:inline-block text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    Kelas {selectedMaterial.grade} &bull; Semester {selectedMaterial.semester || '1'}
+                  </span>
                 </div>
 
-                {/* TP & Metadata Panel */}
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-between space-y-4">
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Target Kompetensi (TP)</h4>
-                    
-                    {selectedMaterial.tp_id ? (
-                      (() => {
-                        const tp = tps.find(t => String(t.id) === String(selectedMaterial.tp_id));
-                        return tp ? (
-                          <div className="space-y-2">
-                            <span className="bg-emerald-100 text-emerald-800 font-extrabold text-[10px] px-2 py-0.5 rounded-lg block w-max">
-                              {tp.code}
-                            </span>
-                            <p className="text-xs font-black text-slate-800">{tp.name}</p>
-                            <p className="text-[10px] text-slate-400 font-medium leading-normal">{tp.description}</p>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-400 italic">Target TP terhubung tidak ditemukan.</p>
-                        );
-                      })()
-                    ) : (
-                      <p className="text-xs text-slate-400 italic">Materi ini bersifat pengayaan umum (tidak spesifik ke TP mandiri).</p>
+                {/* Font Size Adjuster Tools for Reader Eye Health */}
+                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => setReaderFontSize(prev => Math.max(12, prev - 2))}
+                    className="w-7 h-7 flex items-center justify-center text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 rounded-lg transition-colors border border-slate-200 animate-scale"
+                    title="Perkecil Tulisan"
+                  >
+                    A-
+                  </button>
+                  <span className="text-[10px] font-black font-mono text-slate-500 w-6 text-center">
+                    {readerFontSize}
+                  </span>
+                  <button
+                    onClick={() => setReaderFontSize(prev => Math.min(24, prev + 2))}
+                    className="w-7 h-7 flex items-center justify-center text-xs font-bold text-slate-600 bg-white hover:bg-slate-50 rounded-lg transition-colors border border-slate-200 animate-scale"
+                    title="Perbesar Tulisan"
+                  >
+                    A+
+                  </button>
+                  <button
+                    onClick={() => setReaderFontSize(16)}
+                    className="w-7 h-7 flex items-center justify-center text-xs text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+                    title="Reset Ukuran"
+                  >
+                    <RotateCcw size={12} />
+                  </button>
+                </div>
+
+                <button 
+                  onClick={() => setSelectedMaterial(null)}
+                  className="p-1.5 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded-full transition-all"
+                  title="Tutup Membaca"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Scrollable Reader Content */}
+              <div className="flex-1 p-5 sm:p-8 overflow-y-auto space-y-6 bg-slate-50/20">
+                
+                {/* Banner & Title */}
+                <div className="space-y-4">
+                  {/* Estimasi Bacaan */}
+                  <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <Clock size={13} className="text-emerald-600 animate-pulse" />
+                      Estimasi: ~{readTime} Menit Membaca
+                    </span>
+                    {isCompleted && (
+                      <span className="flex items-center gap-1 text-emerald-600 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
+                        <CheckCircle size={12} />
+                        Selesai Kamu Pelajari
+                      </span>
                     )}
                   </div>
 
-                  <div className="pt-3 border-t border-slate-200/50 space-y-1.5">
-                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
-                      <span>Target Kelas:</span>
-                      <span className="text-indigo-600">{selectedMaterial.kelas || 'Semua Kelas'}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
-                      <span>Semester:</span>
-                      <span className="text-emerald-700">Semester {selectedMaterial.semester || '1'}</span>
-                    </div>
-                  </div>
+                  <h1 className="text-xl sm:text-3xl font-black text-slate-800 tracking-tight leading-tight">
+                    {selectedMaterial.title}
+                  </h1>
+                  
+                  {/* Deskripsi ringkas */}
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium leading-relaxed italic bg-emerald-50/40 p-4 rounded-2xl border-l-4 border-emerald-600">
+                    {selectedMaterial.description}
+                  </p>
                 </div>
 
-              </div>
-
-              {/* Teks Pembahasan Lengkap */}
-              <div className="space-y-4 pt-4 border-t border-slate-100">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <BookOpenCheck size={16} className="text-emerald-600" />
-                  Pembahasan Lengkap Materi
-                </h3>
-                
-                {selectedMaterial.text_content ? (
-                  <div className="text-slate-700 text-xs sm:text-sm font-medium leading-relaxed space-y-3 whitespace-pre-line bg-slate-50/30 p-6 rounded-2xl border border-slate-100 font-sans">
-                    {selectedMaterial.text_content}
+                {/* Grid: Image and TP Information */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  
+                  {/* Image Illustration */}
+                  <div className="md:col-span-2 h-48 sm:h-64 rounded-2xl overflow-hidden border border-slate-100 shadow-sm relative shrink-0">
+                    {selectedMaterial.thumbnail ? (
+                      <img 
+                        referrerPolicy="no-referrer" 
+                        src={selectedMaterial.thumbnail} 
+                        alt={selectedMaterial.title} 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center text-slate-300 gap-2">
+                        <BookOpen size={48} />
+                        <span className="text-[10px] font-black uppercase text-slate-400">Dokumentasi Pembelajaran</span>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">Teks materi utama tidak tersedia.</p>
+
+                  {/* TP & Metadata Panel */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-between space-y-4">
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Target Kompetensi (TP)</h4>
+                      
+                      {selectedMaterial.tp_id ? (
+                        (() => {
+                          const tp = tps.find(t => String(t.id) === String(selectedMaterial.tp_id));
+                          return tp ? (
+                            <div className="space-y-2">
+                              <span className="bg-emerald-100 text-emerald-800 font-extrabold text-[10px] px-2 py-0.5 rounded-lg block w-max">
+                                {tp.code}
+                              </span>
+                              <p className="text-xs font-black text-slate-800">{tp.name}</p>
+                              <p className="text-[10px] text-slate-400 font-medium leading-normal">{tp.description}</p>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">Target TP terhubung tidak ditemukan.</p>
+                          );
+                        })()
+                      ) : (
+                        <p className="text-xs text-slate-400 italic">Materi ini bersifat pengayaan umum (tidak spesifik ke TP mandiri).</p>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-200/50 space-y-1.5">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
+                        <span>Target Kelas:</span>
+                        <span className="text-indigo-600">{selectedMaterial.kelas || 'Semua Kelas'}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
+                        <span>Semester:</span>
+                        <span className="text-emerald-700">Semester {selectedMaterial.semester || '1'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Teks Pembahasan Lengkap */}
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <BookOpenCheck size={16} className="text-emerald-600" />
+                    Pembahasan Lengkap Materi
+                  </h3>
+                  
+                  {selectedMaterial.text_content ? (
+                    <div 
+                      style={{ fontSize: `${readerFontSize}px` }}
+                      className="text-slate-800 font-medium leading-relaxed bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 font-sans shadow-sm whitespace-pre-wrap break-words prose max-w-none prose-emerald prose-headings:font-black prose-p:my-2"
+                      dangerouslySetInnerHTML={{ __html: selectedMaterial.text_content }}
+                    />
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">Teks materi utama tidak tersedia.</p>
+                  )}
+                </div>
+
+                {/* External source button if exists */}
+                {selectedMaterial.content_url && (
+                  <div className="pt-4 flex justify-center">
+                    <a
+                      href={selectedMaterial.content_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-indigo-150 transition-all active:scale-95"
+                    >
+                      <LinkIcon size={14} />
+                      Buka Dokumen / Sumber Belajar Eksternal
+                    </a>
+                  </div>
                 )}
+
               </div>
 
-              {/* External source button if exists */}
-              {selectedMaterial.content_url && (
-                <div className="pt-4 flex justify-center">
-                  <a
-                    href={selectedMaterial.content_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-indigo-150 transition-all active:scale-95"
+              {/* Modal Footer Controls */}
+              <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                <span className="text-[10px] text-slate-400 font-bold italic text-center sm:text-left">
+                  {isCompleted 
+                    ? '✓ Materi ini sudah kamu tandai selesai dibaca.' 
+                    : '*Klik tombol di samping untuk mengoleksi lencana selesai membaca!'}
+                </span>
+                
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  {!isCompleted ? (
+                    <button
+                      onClick={() => handleMarkAsCompleted(selectedMaterial.id)}
+                      className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md transition-all active:scale-95"
+                    >
+                      <Sparkles size={14} />
+                      Tandai Selesai Dibaca
+                    </button>
+                  ) : (
+                    <span className="bg-emerald-100 text-emerald-800 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider border border-emerald-200 flex items-center gap-1.5 animate-pulse">
+                      <CheckCircle size={14} />
+                      Selesai Dibaca
+                    </span>
+                  )}
+                  
+                  <button
+                    onClick={() => setSelectedMaterial(null)}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md transition-all active:scale-95 text-center"
                   >
-                    <LinkIcon size={14} />
-                    Buka Dokumen / Sumber Belajar Eksternal
-                  </a>
+                    Tutup
+                  </button>
                 </div>
-              )}
+              </div>
 
             </div>
-
-            {/* Modal Footer Controls */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between shrink-0">
-              <span className="text-[10px] text-slate-400 font-bold italic">
-                *Tandai halaman ini selesai dibaca setelah Anda memahaminya.
-              </span>
-              <button
-                onClick={() => setSelectedMaterial(null)}
-                className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-emerald-50 transition-all active:scale-95"
-              >
-                Selesai Membaca
-              </button>
-            </div>
-
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );

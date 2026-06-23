@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -17,7 +17,16 @@ import {
   CalendarDays,
   Eye,
   RefreshCw,
-  FolderOpen
+  FolderOpen,
+  Bold,
+  Italic,
+  Underline,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  List,
+  ListOrdered,
+  Heading3
 } from 'lucide-react';
 import { db } from '../services/supabaseMock';
 import Swal from 'sweetalert2';
@@ -67,6 +76,26 @@ const TeacherMaterials: React.FC = () => {
 
   // Local storage / Image Upload helper
   const [imagePreview, setImagePreview] = useState<string>('');
+
+  // Ref for Rich Text Editor (contenteditable div)
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  // Helper for applying rich text formatting (WYSIWYG Word Style)
+  const executeCommand = (command: string, value: string = '') => {
+    document.execCommand(command, false, value);
+    if (editorRef.current) {
+      setTextContent(editorRef.current.innerHTML);
+    }
+  };
+
+  // Synchronize initial content to contenteditable div when form is opened or loaded for edit
+  useEffect(() => {
+    if (isFormOpen && editorRef.current) {
+      if (editorRef.current.innerHTML !== textContent) {
+        editorRef.current.innerHTML = textContent;
+      }
+    }
+  }, [isFormOpen, editId]);
 
   // --- FETCH DATA ---
   const loadData = async () => {
@@ -511,16 +540,132 @@ const TeacherMaterials: React.FC = () => {
                     <FileText size={12} className="text-amber-600" />
                     Teks Isi Materi Pembelajaran Lengkap
                   </label>
-                  <textarea
-                    rows={6}
-                    required
-                    placeholder="Tulis teks pembahasan lengkap di sini secara terstruktur dan komprehensif..."
-                    className="w-full px-3.5 py-3 text-xs rounded-xl border border-slate-200 outline-none focus:border-emerald-600 font-medium font-sans"
-                    value={textContent}
-                    onChange={(e) => setTextContent(e.target.value)}
+
+                  {/* Formatting Toolbar (Word Style Helper) */}
+                  <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-50 border border-b-0 border-slate-200 rounded-t-xl select-none">
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => executeCommand('bold')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                      title="Tebal (Bold)"
+                    >
+                      <Bold size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => executeCommand('italic')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                      title="Miring (Italic)"
+                    >
+                      <Italic size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => executeCommand('underline')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                      title="Garis Bawah (Underline)"
+                    >
+                      <Underline size={14} />
+                    </button>
+                    
+                    <div className="w-px h-5 bg-slate-200 mx-1"></div>
+
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => executeCommand('formatBlock', '<h3>')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-700 transition-colors font-extrabold text-xs"
+                      title="Sub-judul (Heading 3)"
+                    >
+                      <Heading3 size={14} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => executeCommand('formatBlock', '<p>')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-700 transition-colors font-bold text-xs"
+                      title="Paragraf Normal (Paragraph)"
+                    >
+                      P
+                    </button>
+
+                    <div className="w-px h-5 bg-slate-200 mx-1"></div>
+
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => executeCommand('justifyLeft')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                      title="Rata Kiri"
+                    >
+                      <AlignLeft size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => executeCommand('justifyCenter')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                      title="Rata Tengah"
+                    >
+                      <AlignCenter size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => executeCommand('justifyRight')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                      title="Rata Kanan"
+                    >
+                      <AlignRight size={14} />
+                    </button>
+
+                    <div className="w-px h-5 bg-slate-200 mx-1"></div>
+
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => executeCommand('insertUnorderedList')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                      title="Daftar Bullet (Bullet List)"
+                    >
+                      <List size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => executeCommand('insertOrderedList')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-slate-700 transition-colors"
+                      title="Daftar Angka (Numbered List)"
+                    >
+                      <ListOrdered size={14} />
+                    </button>
+
+                    <div className="w-px h-5 bg-slate-200 mx-1"></div>
+
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => executeCommand('removeFormat')}
+                      className="p-1.5 hover:bg-slate-200 rounded text-red-600 transition-colors"
+                      title="Hapus Semua Format (Clear Formatting)"
+                    >
+                      <RefreshCw size={12} />
+                    </button>
+                  </div>
+
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    onInput={(e) => setTextContent(e.currentTarget.innerHTML)}
+                    placeholder="Tulis teks pembahasan lengkap di sini secara terstruktur dan komprehensif. Blok kata/teks lalu klik tombol toolbar di atas untuk memberi gaya visual langsung..."
+                    className="w-full min-h-[300px] max-h-[600px] overflow-y-auto px-4 py-3 text-xs sm:text-sm rounded-b-xl border border-slate-200 outline-none focus:border-emerald-600 bg-white font-sans prose max-w-none focus:ring-1 focus:ring-emerald-600 focus:ring-opacity-50 relative empty:before:content-[attr(placeholder)] before:text-slate-400 before:pointer-events-none before:absolute before:left-4 before:top-3 before:italic before:font-medium"
                   />
-                  <p className="text-[9px] text-slate-400 mt-1">
-                    *Materi yang Anda tulis akan disajikan dengan layout membaca khusus yang interaktif untuk siswa.
+                  <p className="text-[9px] text-slate-400 mt-1 leading-relaxed">
+                    *Materi visual di atas mendukung pemformatan langsung layaknya Microsoft Word dan akan disajikan secara responsif & interaktif untuk kenyamanan membaca siswa.
                   </p>
                 </div>
               </div>
