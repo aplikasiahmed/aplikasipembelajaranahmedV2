@@ -16,7 +16,8 @@ import {
   Settings,
   Scale,
   Target,
-  Activity
+  Activity,
+  BookOpen
 } from 'lucide-react';
 import { db } from '../services/supabaseMock';
 
@@ -50,6 +51,7 @@ const TeacherDashboard: React.FC = () => {
   const menuItems = [
     { title: 'Tujuan Pembelajaran', path: '/guru/tujuanpembelajaran', icon: Target, color: 'bg-emerald-800', text: 'text-emerald-800', bg: 'bg-emerald-50 border border-emerald-100', desc: 'Kelola Capaian Kompetensi & TP' },
     { title: 'Bobot Penilaian', path: '/guru/bobotnilai', icon: Scale, color: 'bg-emerald-700', text: 'text-emerald-700', bg: 'bg-emerald-50 border border-emerald-100/50', desc: 'Atur Kontribusi Persentase Nilai' },
+    { title: 'Materi Pembelajaran', path: '/guru/materi', icon: BookOpen, color: 'bg-emerald-600', text: 'text-emerald-600', bg: 'bg-emerald-50 border border-emerald-100', desc: 'Kelola gambar, modul & teks materi' },
     { title: 'Data Siswa', path: '/guru/datasiswa', icon: Users, color: 'bg-blue-600', text: 'text-blue-600', bg: 'bg-blue-50/80 border border-blue-100', desc: 'Kelola & Import data siswa' },
     { title: 'Input Nilai', path: '/guru/nilai', icon: Award, color: 'bg-emerald-600', text: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Kelola nilai harian & ujian' },
     { title: 'Input Absensi', path: '/guru/absensi', icon: ClipboardCheck, color: 'bg-amber-600', text: 'text-amber-600', bg: 'bg-amber-50', desc: 'Rekap kehadiran harian' },

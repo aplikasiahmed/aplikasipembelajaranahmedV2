@@ -107,7 +107,8 @@ class DatabaseService {
           const isTableValid = TABS_CONFIG.some(cfg => cfg.name === name);
           if (isTableValid) {
             this.syncTableToGoogleSheets(name, token).catch(err => {
-              console.error(`Auto-sync background error for sheet ${name}:`, err);
+              // Gracefully handle or log as warn to avoid noisy background fetch errors in offline or unconfigured environments
+              console.warn(`Auto-sync background info for sheet ${name} (non-blocking):`, err.message || err);
             });
           }
         }
@@ -1508,7 +1509,11 @@ class DatabaseService {
           grade: '9',
           category: 'Aqidah',
           content_url: 'https://docs.google.com/document/d/1G_iMlKROJmq0UPb1Angg4IphW7BxVcron8yBEla7p2c/edit',
-          thumbnail: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=500'
+          thumbnail: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=500',
+          semester: 'Ganjil',
+          kelas: 'Semua Kelas',
+          text_content: 'Iman kepada hari akhir adalah mempercayai bahwa seluruh alam semesta beserta isinya akan hancur dan manusia akan dibangkitkan untuk dimintai pertanggungjawaban.',
+          created_at: new Date().toISOString()
         },
         {
           id: 'mat-2',
@@ -1517,7 +1522,11 @@ class DatabaseService {
           grade: '8',
           category: 'Fiqih',
           content_url: 'https://docs.google.com/document/d/1G_iMlKROJmq0UPb1Angg4IphW7BxVcron8yBEla7p2c/edit',
-          thumbnail: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=500'
+          thumbnail: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=500',
+          semester: 'Genap',
+          kelas: 'Semua Kelas',
+          text_content: 'Zakat merupakan salah satu rukun Islam yang wajib ditunaikan bagi yang memenuhi syarat, terdiri dari Zakat Fitrah yang dikeluarkan di bulan Ramadhan dan Zakat Mal yang berdasarkan haul dan nisab.',
+          created_at: new Date().toISOString()
         }
       ];
       this.setLocalTable('materi_belajar', defaults);
@@ -1527,6 +1536,36 @@ class DatabaseService {
       return list.filter(m => m.grade === grade);
     }
     return list;
+  }
+
+  async createMaterial(material: Omit<Material, 'id'>): Promise<Material> {
+    const list = this.getLocalTable<Material>('materi_belajar') || [];
+    const newMaterial: Material = {
+      ...material,
+      id: 'mat_' + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+    list.push(newMaterial);
+    this.setLocalTable('materi_belajar', list);
+    return newMaterial;
+  }
+
+  async updateMaterial(id: string, data: Partial<Material>): Promise<Material> {
+    const list = this.getLocalTable<Material>('materi_belajar') || [];
+    const index = list.findIndex(m => m.id === id);
+    if (index === -1) {
+      throw new Error('Materi tidak ditemukan');
+    }
+    const updated = { ...list[index], ...data };
+    list[index] = updated;
+    this.setLocalTable('materi_belajar', list);
+    return updated;
+  }
+
+  async deleteMaterial(id: string): Promise<void> {
+    const list = this.getLocalTable<Material>('materi_belajar') || [];
+    const filtered = list.filter(m => m.id !== id);
+    this.setLocalTable('materi_belajar', filtered);
   }
 
   // --- EXAM & QUESTION FUNCTIONS ---

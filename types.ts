@@ -59,6 +59,11 @@ export interface Material {
   category: 'Aqidah' | 'Fiqih' | 'Sejarah' | 'Akhlak' | 'Al-Quran';
   content_url: string;
   thumbnail?: string;
+  semester?: string;     // e.g., 'Ganjil' | 'Genap'
+  kelas?: string;        // e.g., 'Semua Kelas', '7.1', '8.1', dll.
+  tp_id?: string;        // ID Tujuan Pembelajaran
+  text_content?: string; // Teks isi materi lengkap
+  created_at?: string;
 }
 
 // --- NEW TYPES FOR EXAM SYSTEM ---

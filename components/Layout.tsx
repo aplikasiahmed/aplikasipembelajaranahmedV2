@@ -93,6 +93,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Dashboard', path: '/guru', icon: LayoutDashboard },
     { name: 'Tujuan Pembelajaran', path: '/guru/tujuanpembelajaran', icon: Target },
     { name: 'Bobot Penilaian', path: '/guru/bobotnilai', icon: Scale },
+    { name: 'Materi Pembelajaran', path: '/guru/materi', icon: BookOpen },
     { name: 'Data Siswa', path: '/guru/datasiswa', icon: Users },
     { name: 'Input Nilai', path: '/guru/nilai', icon: Award },
     { name: 'Input Absensi', path: '/guru/absensi', icon: ClipboardCheck },

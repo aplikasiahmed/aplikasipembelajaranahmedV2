@@ -1,14 +1,28 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Calendar, Quote } from 'lucide-react';
+import { db } from '../services/supabaseMock';
+import { Material } from '../types';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
+  const [materials, setMaterials] = useState<Material[]>([]);
+
+  useEffect(() => {
+    db.getMaterials()
+      .then(res => setMaterials(res))
+      .catch(err => console.error('Gagal memuat materi:', err));
+  }, []);
+
+  const hasMaterials = (gradeVal: string) => {
+    return materials.some(m => String(m.grade) === String(gradeVal));
+  };
+
   const features = [
-    { title: 'Kelas 7', desc: 'Materi dalam tahap pengembangan konten', color: 'bg-blue-500' },
-    { title: 'Kelas 8', desc: 'Materi dalam tahap pengembangan konten', color: 'bg-emerald-500' },
-    { title: 'Kelas 9', desc: 'Materi dalam tahap pengembangan konten', color: 'bg-amber-500' },
+    { title: 'Kelas 7', desc: hasMaterials('7') ? '' : 'Materi dalam tahap pengembangan konten', color: 'bg-blue-500' },
+    { title: 'Kelas 8', desc: hasMaterials('8') ? '' : 'Materi dalam tahap pengembangan konten', color: 'bg-emerald-500' },
+    { title: 'Kelas 9', desc: hasMaterials('9') ? '' : 'Materi dalam tahap pengembangan konten', color: 'bg-amber-500' },
   ];
 
   return (
@@ -47,18 +61,25 @@ const Home: React.FC = () => {
 
       {/* Stats/Grades - Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {features.map((item, idx) => (
-          <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all duration-300 group cursor-default">
-            <div className={`w-10 h-10 ${item.color} rounded-xl mb-4 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform`}>
-              <Users size={20} />
+        {features.map((item, idx) => {
+          const gradeVal = item.title.replace(/\D/g, '');
+          return (
+            <div 
+              key={idx} 
+              onClick={() => navigate('/materi', { state: { grade: gradeVal } })}
+              className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all duration-300 group cursor-pointer"
+            >
+              <div className={`w-10 h-10 ${item.color} rounded-xl mb-4 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform`}>
+                <Users size={20} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 mb-1">{item.title}</h3>
+              {item.desc && <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>}
+              <div className="mt-4 flex items-center gap-2 text-slate-300 font-bold text-[10px] uppercase tracking-wider group-hover:text-emerald-600 transition-colors">
+                Lihat Materi <Calendar size={12} />
+              </div>
             </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-1">{item.title}</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">{item.desc}</p>
-            <div className="mt-4 flex items-center gap-2 text-slate-300 font-bold text-[10px] uppercase tracking-wider group-hover:text-emerald-600 transition-colors">
-              Detail Kelas <Calendar size={12} />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Hadith Section - Positioned above footer */}
