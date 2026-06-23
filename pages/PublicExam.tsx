@@ -186,6 +186,16 @@ const PublicExam: React.FC = () => {
       }
 
       setStudent(s);
+      
+      // Simpan sesi pencarian siswa aktif untuk tracking kunjungan halaman lain
+      localStorage.setItem('pai_last_active_student', JSON.stringify({
+        nis: s.nis,
+        namalengkap: s.namalengkap,
+        kelas: s.kelas
+      }));
+      
+      // Log langsung kunjungan ini
+      db.logKunjungan(s.nis, s.namalengkap, s.kelas, 'Kerjakan Soal');
 
       // 3. Cek Apakah Sudah Mengerjakan
       const hasTaken = await db.checkStudentExamResult(s.nis, selectedExam.id);

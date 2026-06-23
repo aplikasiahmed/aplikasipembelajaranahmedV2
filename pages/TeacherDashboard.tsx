@@ -15,7 +15,8 @@ import {
   LayoutDashboard,
   Settings,
   Scale,
-  Target
+  Target,
+  Activity
 } from 'lucide-react';
 import { db } from '../services/supabaseMock';
 
@@ -58,6 +59,7 @@ const TeacherDashboard: React.FC = () => {
     { title: 'Laporan', path: '/guru/laporan', icon: TrendingUp, color: 'bg-red-600', text: 'text-red-600', bg: 'bg-red-50', desc: 'Export PDF & Excel' },
     { title: 'Kelola Admin', path: '/guru/admin', icon: ShieldCheck, color: 'bg-blue-600', text: 'text-blue-600', bg: 'bg-blue-50', desc: 'Manajemen akun pengajar' },
     { title: 'Pengaturan', path: '/guru/pengaturan', icon: Settings, color: 'bg-slate-600', text: 'text-slate-600', bg: 'bg-slate-50', desc: 'Integrasi Sheets, Excel & DB Reset' },
+    { title: 'Statistik Kunjungan', path: '/guru/statistik', icon: Activity, color: 'bg-amber-600', text: 'text-amber-600', bg: 'bg-amber-50', desc: 'Monitor aktivitas & keaktifan siswa' },
   ];
 
   return (

@@ -22,6 +22,7 @@ import TeacherExamEditor from './pages/TeacherExamEditor';
 import TeacherSettings from './pages/TeacherSettings';
 import TeacherWeightSettings from './pages/TeacherWeightSettings';
 import TeacherStudents from './pages/TeacherStudents';
+import TeacherVisits from './pages/TeacherVisits';
 import { db } from './services/supabaseMock';
 
 // Higher Order Component for Route Protection
@@ -53,6 +54,52 @@ const ScrollToTop = () => {
   return null;
 };
 
+// Sesi global: Simpan tracker terakhir guna menghindari pencatatan ganda pada render ganda/cepat React 18
+let lastLoggedPath = '';
+let lastLoggedTime = 0;
+
+const PageTracker: React.FC = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    const path = pathname;
+    
+    // Jangan log halaman guru/admin
+    if (path.startsWith('/guru')) return;
+    
+    // Cegah pencatatan dobel dalam waktu kurang dari 2 detik untuk path yang sama
+    const now = Date.now();
+    if (path === lastLoggedPath && (now - lastLoggedTime) < 2000) {
+      return;
+    }
+    lastLoggedPath = path;
+    lastLoggedTime = now;
+
+    // Mapping path ke label yang ramah
+    let pageLabel = 'Beranda';
+    if (path === '/materi') pageLabel = 'Materi PAI';
+    else if (path === '/absensi') pageLabel = 'Cek Absensi';
+    else if (path === '/nilai') pageLabel = 'Nilai Siswa';
+    else if (path === '/tugas') pageLabel = 'Kirim Tugas';
+    else if (path === '/kerjakan-tugas') pageLabel = 'Kerjakan Soal / Ujian';
+    else if (path === '/profil') pageLabel = 'Profil Guru';
+
+    const lastStudentStr = localStorage.getItem('pai_last_active_student');
+    if (lastStudentStr) {
+      try {
+        const stud = JSON.parse(lastStudentStr);
+        db.logKunjungan(stud.nis, stud.namalengkap, stud.kelas, pageLabel);
+      } catch (e) {
+        db.logKunjungan('Anonim', 'Pengunjung Umum', 'Umum', pageLabel);
+      }
+    } else {
+      db.logKunjungan('Anonim', 'Pengunjung Umum', 'Umum', pageLabel);
+    }
+  }, [pathname]);
+
+  return null;
+};
+
 const App: React.FC = () => {
   useEffect(() => {
     // Jalankan sinkronisasi background saat aplikasi dibuka oleh siapa saja (Siswa maupun Guru)
@@ -64,6 +111,7 @@ const App: React.FC = () => {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ScrollToTop />
+      <PageTracker />
       <Layout>
         <Routes>
           {/* Public Routes */}
@@ -142,6 +190,11 @@ const App: React.FC = () => {
           <Route path="/guru/pengaturan" element={
             <ProtectedRoute>
               <TeacherSettings />
+            </ProtectedRoute>
+          } />
+          <Route path="/guru/statistik" element={
+            <ProtectedRoute>
+              <TeacherVisits />
             </ProtectedRoute>
           } />
           

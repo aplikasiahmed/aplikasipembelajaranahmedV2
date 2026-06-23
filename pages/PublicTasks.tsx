@@ -42,6 +42,17 @@ const PublicTasks: React.FC = () => {
             jeniskelamin: student.jeniskelamin || '-'
           }));
           setIsVerified(true);
+          
+          // Simpan sesi pencarian siswa aktif untuk tracking kunjungan halaman lain
+          localStorage.setItem('pai_last_active_student', JSON.stringify({
+            nis: student.nis,
+            namalengkap: student.namalengkap,
+            kelas: student.kelas
+          }));
+          
+          // Log langsung kunjungan ini
+          db.logKunjungan(student.nis, student.namalengkap, student.kelas, 'Kirim Tugas');
+
           Swal.fire({ 
             toast: true, 
             position: 'top-end', 

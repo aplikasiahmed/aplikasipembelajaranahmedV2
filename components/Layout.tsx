@@ -17,7 +17,8 @@ import {
   Scroll,
   TrendingUp,
   Scale,
-  Target
+  Target,
+  Activity
 } from 'lucide-react';
 import BottomNav from './BottomNav';
 import TeacherLogin from '../pages/TeacherLogin';
@@ -101,6 +102,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Laporan Nilai', path: '/guru/laporan', icon: TrendingUp },
     { name: 'Kelola Admin', path: '/guru/admin', icon: ShieldCheck },
     { name: 'Pengaturan', path: '/guru/pengaturan', icon: Settings },
+    { name: 'Statistik Kunjungan', path: '/guru/statistik', icon: Activity },
   ];
 
   if (isTeacherPage) {

@@ -38,6 +38,17 @@ const PublicAbsensi: React.FC = () => {
       const found = await db.getStudentByNISN(nisn);
       if (found) {
         setStudent(found);
+        
+        // Simpan sesi pencarian siswa aktif untuk tracking kunjungan halaman lain
+        localStorage.setItem('pai_last_active_student', JSON.stringify({
+          nis: found.nis,
+          namalengkap: found.namalengkap,
+          kelas: found.kelas
+        }));
+        
+        // Log langsung kunjungan ini
+        db.logKunjungan(found.nis, found.namalengkap, found.kelas, 'Cek Absensi');
+
         const records = await db.getAttendanceByStudent(found.id!);
         setAllAttendance(records);
         

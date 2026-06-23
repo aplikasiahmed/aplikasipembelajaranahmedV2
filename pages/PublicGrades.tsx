@@ -49,6 +49,16 @@ const PublicGrades: React.FC = () => {
       if (found) {
         setStudent(found);
         
+        // Simpan sesi pencarian siswa aktif untuk tracking kunjungan halaman lain
+        localStorage.setItem('pai_last_active_student', JSON.stringify({
+          nis: found.nis,
+          namalengkap: found.namalengkap,
+          kelas: found.kelas
+        }));
+        
+        // Log langsung kunjungan ini
+        db.logKunjungan(found.nis, found.namalengkap, found.kelas, 'Cek Nilai');
+
         // 1. Ambil data nilai standard dari table "Nilai"
         const studentGrades = await db.getGradesByStudent(found.id!);
         setAllGrades(studentGrades);
