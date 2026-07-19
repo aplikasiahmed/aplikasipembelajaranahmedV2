@@ -580,9 +580,9 @@ class DatabaseService {
                   });
                   items.push(obj);
                 }
-                if (items.length > 0) {
-                  this.setLocalTable(cfg.name, items);
-                }
+                this.setLocalTable(cfg.name, items);
+              } else {
+                this.setLocalTable(cfg.name, []);
               }
             }
           } catch (e) {
@@ -608,7 +608,10 @@ class DatabaseService {
           for (const cfg of TABS_CONFIG) {
             const res = await this.fetchSheetsAPI(spreadsheetId, `/values/${encodeURIComponent(cfg.name)}!A1:Z5000`, { method: 'GET' }, token);
             const rows: any[][] = res.values || [];
-            if (rows.length <= 1) continue;
+            if (rows.length <= 1) {
+              this.setLocalTable(cfg.name, []);
+              continue;
+            }
             
             const headers = rows[0];
             const items: any[] = [];
@@ -689,9 +692,7 @@ class DatabaseService {
                     }
                   });
 
-                  if (items.length > 0) {
-                    this.setLocalTable(cfg.name, items);
-                  }
+                  this.setLocalTable(cfg.name, items);
                 }
               }
             }

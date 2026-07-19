@@ -95,18 +95,18 @@ const PublicTasks: React.FC = () => {
 
   const showTutorial = (e: React.MouseEvent) => {
     e.preventDefault();
-    const videoUrl = "https://irqphggbsncuplifywul.supabase.co/storage/v1/object/sign/video/Cara%20Upload%20File%20dan%20Share%20Link%20Google%20Drive%20Lewat%20HP%202026.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9kMjA2YTI2NS1hNTMwLTQ5ODktOTBhNS03Yjg2ZmNmZGM0ODYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ2aWRlby9DYXJhIFVwbG9hZCBGaWxlIGRhbiBTaGFyZSBMaW5rIEdvb2dsZSBEcml2ZSBMZXdhdCBIUCAyMDI2Lm1wNCIsImlhdCI6MTc2OTg4NDg4MiwiZXhwIjoxODY0NDkyODgyfQ.eITFK8P06j4zq857eGx6liWNqnyFeLi4QrP_D12KKeU";
+    const embedUrl = "https://www.youtube.com/embed/ZB9zIR5FKqc?autoplay=1";
     
     Swal.fire({
       // REVISI LAYOUT TOTAL:
       // 1. Tombol X berada di container sendiri paling atas (flex-end).
       // 2. Judul berada di bawahnya (Center).
-      // 3. Video di bawah judul.
+      // 3. Iframe YouTube di bawah judul.
       // Ini menjamin judul tidak tertutup tombol X dan subjudul tidak terpotong.
       html: `
-        <div class="flex flex-col w-full">
+        <div class="flex flex-col w-full items-center">
           <!-- ROW 1: TOMBOL X -->
-          <div class="flex justify-end mb-1">
+          <div class="flex justify-end w-full mb-1">
             <button 
               id="close-tutorial-btn"
               class="bg-red-500 text-white rounded-full w-9 h-9 flex items-center justify-center shadow-md hover:bg-red-600 transition-all active:scale-90 border-2 border-white"
@@ -119,22 +119,21 @@ const PublicTasks: React.FC = () => {
           </div>
 
           <!-- ROW 2: JUDUL & SUBJUDUL -->
-          <div class="text-center px-1 mb-4">
+          <div class="text-center px-1 mb-4 w-full">
              <h3 class="text-lg md:text-xl font-bold text-slate-800 leading-tight">Tutorial Upload Drive</h3>
           </div>
 
-          <!-- ROW 3: VIDEO PLAYER -->
-          <div class="w-full bg-white rounded-xl overflow-hidden shadow-2xl border border-slate-200 flex justify-center bg-black">
-            <video 
-              src="${videoUrl}" 
-              controls 
-              autoplay
-              playsinline
-              class="w-full h-auto max-h-[70vh] object-contain"
+          <!-- ROW 3: EMBEDDED YOUTUBE SHORTS (Portrait 9:16) -->
+          <div class="w-full max-w-[320px] bg-black rounded-2xl overflow-hidden shadow-2xl border border-slate-200 flex justify-center" style="aspect-ratio: 9/16;">
+            <iframe 
+              src="${embedUrl}" 
+              title="Tutorial Upload Drive"
+              frameborder="0" 
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+              allowfullscreen
+              class="w-full h-full"
               style="display: block;"
-            >
-              Browser Anda tidak mendukung pemutaran video.
-            </video>
+            ></iframe>
           </div>
         </div>
       `,
