@@ -1499,39 +1499,7 @@ class DatabaseService {
   }
 
   async getMaterials(grade?: GradeLevel): Promise<Material[]> {
-    let list = this.getLocalTable<Material>('materi_belajar');
-    if (list.length === 0) {
-      const defaults: Material[] = [
-        {
-          id: 'mat-1',
-          title: 'Mengenal Iman kepada Hari Akhir',
-          description: 'Materi PAI Kelas 9 tentang hakikat, tanda-tanda, dan hikmah beriman kepada Hari Kiamat.',
-          grade: '9',
-          category: 'Aqidah',
-          content_url: 'https://docs.google.com/document/d/1G_iMlKROJmq0UPb1Angg4IphW7BxVcron8yBEla7p2c/edit',
-          thumbnail: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=500',
-          semester: 'Ganjil',
-          kelas: 'Semua Kelas',
-          text_content: 'Iman kepada hari akhir adalah mempercayai bahwa seluruh alam semesta beserta isinya akan hancur dan manusia akan dibangkitkan untuk dimintai pertanggungjawaban.',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: 'mat-2',
-          title: 'Ketentuan Zakat Fitrah dan Zakat Mal',
-          description: 'Materi PAI Kelas 8 tentang rukun, syarat, dan tata cara pelaksanaan ibadah zakat.',
-          grade: '8',
-          category: 'Fiqih',
-          content_url: 'https://docs.google.com/document/d/1G_iMlKROJmq0UPb1Angg4IphW7BxVcron8yBEla7p2c/edit',
-          thumbnail: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=500',
-          semester: 'Genap',
-          kelas: 'Semua Kelas',
-          text_content: 'Zakat merupakan salah satu rukun Islam yang wajib ditunaikan bagi yang memenuhi syarat, terdiri dari Zakat Fitrah yang dikeluarkan di bulan Ramadhan dan Zakat Mal yang berdasarkan haul dan nisab.',
-          created_at: new Date().toISOString()
-        }
-      ];
-      this.setLocalTable('materi_belajar', defaults);
-      list = defaults;
-    }
+    let list = this.getLocalTable<Material>('materi_belajar').filter(m => m.id !== 'mat-1' && m.id !== 'mat-2');
     if (grade) {
       return list.filter(m => m.grade === grade);
     }

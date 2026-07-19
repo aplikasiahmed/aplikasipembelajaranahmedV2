@@ -171,6 +171,19 @@ const PublicMaterials: React.FC = () => {
           <div className="w-10 h-10 border-4 border-slate-100 border-t-emerald-600 rounded-full animate-spin mx-auto"></div>
           <p className="text-sm text-slate-500 font-medium">Memuat katalog materi PAI...</p>
         </div>
+      ) : materials.length === 0 ? (
+        <div className="bg-white p-12 md:p-16 rounded-[2rem] border border-slate-100 shadow-sm text-center space-y-4">
+          <div className="relative w-16 h-16 mx-auto">
+            <div className="absolute inset-0 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+            <BookOpen className="absolute inset-0 m-auto text-emerald-600 animate-pulse" size={24} />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-base font-black text-slate-800 uppercase tracking-wide">Materi Pembelajaran</h3>
+            <p className="text-xs sm:text-sm font-semibold text-slate-500 max-w-md mx-auto">
+              materi pembalajaran dalam pengembangan guru
+            </p>
+          </div>
+        </div>
       ) : (
         <>
           {/* Filter & Search Bar */}
