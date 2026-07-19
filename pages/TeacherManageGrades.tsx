@@ -106,6 +106,24 @@ const TeacherManageGrades: React.FC = () => {
 
   // --- INITIALIZE DATA & TRIGGERS ---
   useEffect(() => {
+    const hashParts = window.location.hash.split('?');
+    const params = new URLSearchParams(hashParts[1] || window.location.search);
+    const gradeParam = params.get('grade');
+    const semesterParam = params.get('semester');
+    const kelasParam = params.get('kelas');
+
+    if (gradeParam) {
+      setSelectedGrade(gradeParam);
+    }
+    if (semesterParam) {
+      setSelectedSemester(semesterParam);
+    }
+    if (kelasParam) {
+      setSelectedKelas(kelasParam);
+    }
+  }, []);
+
+  useEffect(() => {
     // 1. Fetch available classes
     db.getAvailableKelas(selectedGrade as any).then((classes) => {
       setAvailableClasses(classes);

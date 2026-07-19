@@ -73,6 +73,16 @@ const TeacherObjectives: React.FC = () => {
     name: 'Tugas 1',
     type: 'Penulisan',
   });
+  const [editingAsmId, setEditingAsmId] = useState<string | null>(null);
+
+  const handleEditAsmInitiate = (asm: TPAssessment) => {
+    setEditingAsmId(asm.id);
+    setSelectedTpId(asm.tpId);
+    setAsmForm({
+      name: asm.name,
+      type: asm.type,
+    });
+  };
 
   // --- INITIALIZE DATA FROM LOCALSTORAGE ---
   useEffect(() => {
@@ -300,15 +310,37 @@ const TeacherObjectives: React.FC = () => {
       return;
     }
 
-    const newAsm: TPAssessment = {
-      id: 'asm_' + Math.random().toString(36).substr(2, 9),
-      tpId: selectedTpId,
-      name: asmForm.name.trim(),
-      type: asmForm.type,
-    };
+    if (editingAsmId) {
+      const updated = assessments.map(a => a.id === editingAsmId ? { ...a, tpId: selectedTpId, name: asmForm.name.trim(), type: asmForm.type } : a);
+      saveAssessmentsToStorage(updated);
+      setEditingAsmId(null);
 
-    const updated = [...assessments, newAsm];
-    saveAssessmentsToStorage(updated);
+      Swal.fire({ 
+        icon: 'success', 
+        title: 'Penilaian TP Berhasil Diperbarui', 
+        timer: 1500, 
+        showConfirmButton: false, 
+        heightAuto: false 
+      });
+    } else {
+      const newAsm: TPAssessment = {
+        id: 'asm_' + Math.random().toString(36).substr(2, 9),
+        tpId: selectedTpId,
+        name: asmForm.name.trim(),
+        type: asmForm.type,
+      };
+
+      const updated = [...assessments, newAsm];
+      saveAssessmentsToStorage(updated);
+
+      Swal.fire({ 
+        icon: 'success', 
+        title: 'Penilaian TP Berhasil Ditambahkan', 
+        timer: 1500, 
+        showConfirmButton: false, 
+        heightAuto: false 
+      });
+    }
 
     // Auto increment default name for utility
     const nextNum = parseInt(asmForm.name.replace(/^\D+/g, '')) || 0;
@@ -316,14 +348,6 @@ const TeacherObjectives: React.FC = () => {
       ...prev,
       name: `Tugas ${nextNum ? nextNum + 1 : assessments.filter(a => a.tpId === selectedTpId).length + 2}`
     }));
-
-    Swal.fire({ 
-      icon: 'success', 
-      title: 'Penilaian TP Berhasil Ditambahkan', 
-      timer: 1500, 
-      showConfirmButton: false, 
-      heightAuto: false 
-    });
   };
 
   const handleDeleteAssessment = async (id: string) => {
@@ -435,14 +459,25 @@ const TeacherObjectives: React.FC = () => {
           <span>DASHBOARD UTAMA</span>
         </button>
 
-        <button 
-          onClick={handleResetAllTps}
-          className="group flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/50 transition-all font-black text-[10px] md:text-xs uppercase tracking-wider mb-2 shadow-sm"
-          id="btn-reset-semua-tp"
-        >
-          <RotateCcw size={13} className="transition-transform group-hover:-rotate-180 duration-500" />
-          <span>Atur Ulang / Reset TP</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button 
+            onClick={() => navigate(`/guru/Nilai-rapot?grade=${selectedGrade}&semester=${selectedSemester}`)}
+            className="group flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white transition-all font-black text-[10px] md:text-xs uppercase tracking-wider mb-2 shadow-md active:scale-95"
+            id="btn-goto-nilai-rapot"
+          >
+            <Award size={13} />
+            <span>Isi Nilai Rapot (Ledger)</span>
+          </button>
+
+          <button 
+            onClick={handleResetAllTps}
+            className="group flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/50 transition-all font-black text-[10px] md:text-xs uppercase tracking-wider mb-2 shadow-sm"
+            id="btn-reset-semua-tp"
+          >
+            <RotateCcw size={13} className="transition-transform group-hover:-rotate-180 duration-500" />
+            <span>Atur Ulang / Reset TP</span>
+          </button>
+        </div>
       </div>
 
       {/* JUMBOTRON HEADER */}
@@ -668,7 +703,7 @@ const TeacherObjectives: React.FC = () => {
             <div className="flex items-center gap-2 border-b border-slate-55 pb-2">
               <PlusCircle size={18} className="text-emerald-700" />
               <h2 className="text-xs font-black uppercase text-slate-800 tracking-wider">
-                Desain Evaluasi Baru
+                {editingAsmId ? 'Edit Desain Evaluasi' : 'Desain Evaluasi Baru'}
               </h2>
             </div>
 
@@ -722,9 +757,21 @@ const TeacherObjectives: React.FC = () => {
                 disabled={currentClassTps.length === 0}
                 className="w-full py-3.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs uppercase tracking-widest shadow-sm active:scale-95 transition mt-3 flex items-center justify-center gap-2 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
               >
-                <Plus size={15} />
-                <span>Buat Instrumen Tugas</span>
+                {editingAsmId ? <Save size={15} /> : <Plus size={15} />}
+                <span>{editingAsmId ? 'Simpan Perubahan' : 'Buat Instrumen Tugas'}</span>
               </button>
+
+              {editingAsmId && (
+                <button 
+                  onClick={() => {
+                    setEditingAsmId(null);
+                    setAsmForm({ name: 'Tugas 1', type: 'Penulisan' });
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider transition mt-1 flex items-center justify-center gap-2"
+                >
+                  Batal Edit
+                </button>
+              )}
             </div>
           </div>
 
@@ -778,13 +825,30 @@ const TeacherObjectives: React.FC = () => {
                                   {asm.type}
                                 </span>
                               </div>
-                              <button 
-                                onClick={() => handleDeleteAssessment(asm.id)}
-                                className="text-slate-400 hover:text-red-600 p-2 rounded-xl hover:bg-red-50 border border-transparent hover:border-red-100/30 transition"
-                                title="Hapus Tugas"
-                              >
-                                <Trash2 size={12} />
-                              </button>
+                              <div className="flex items-center gap-1">
+                                <button 
+                                  onClick={() => navigate(`/guru/Nilai-rapot?grade=${selectedGrade}&semester=${selectedSemester}`)}
+                                  className="px-2 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-100/50 transition flex items-center gap-1 text-[9px] font-black uppercase tracking-wider"
+                                  title="Input Nilai Tugas"
+                                >
+                                  <Award size={10} />
+                                  <span>Isi Nilai</span>
+                                </button>
+                                <button 
+                                  onClick={() => handleEditAsmInitiate(asm)}
+                                  className="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 border border-transparent hover:border-blue-100/30 transition"
+                                  title="Edit Tugas"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteAssessment(asm.id)}
+                                  className="text-slate-400 hover:text-red-650 p-1.5 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100/30 transition"
+                                  title="Hapus Tugas"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>

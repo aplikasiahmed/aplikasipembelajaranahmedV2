@@ -93,7 +93,22 @@ const PublicGrades: React.FC = () => {
 
   // Filter dan Sort Data berdasarkan Tanggal (Ascending/Berurutan)
   const filteredGrades = allGrades
-    .filter(g => String(g.semester) === String(semester))
+    .filter(g => {
+      if (String(g.semester) !== String(semester)) return false;
+      const desc = g.description || '';
+      if (
+        desc.includes('Rata-Rata Nilai Harian') ||
+        desc.includes('Sumatif Tengah Semester') ||
+        desc.includes('Sumatif Akhir Semester') ||
+        desc.includes('Penilaian Sikap') ||
+        desc.includes('Persentase Kehadiran') ||
+        desc.includes('Rata-Rata Ledger') ||
+        desc.includes('Nilai Akhir Rapor')
+      ) {
+        return false;
+      }
+      return true;
+    })
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   // Helper untuk format tanggal dd/mm/yyyy

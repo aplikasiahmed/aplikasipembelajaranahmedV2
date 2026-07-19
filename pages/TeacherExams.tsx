@@ -101,7 +101,25 @@ const TeacherExams: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      if (name === 'tp_id') {
+        if (value) {
+          const currentAsm = assessments.find(a => a.id === prev.assessment_id);
+          if (currentAsm && currentAsm.tpId !== value) {
+            updated.assessment_id = ''; // reset since it doesn't match
+          }
+        }
+      } else if (name === 'assessment_id') {
+        if (value) {
+          const currentAsm = assessments.find(a => a.id === value);
+          if (currentAsm) {
+            updated.tp_id = currentAsm.tpId;
+          }
+        }
+      }
+      return updated;
+    });
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -451,7 +469,7 @@ const TeacherExams: React.FC = () => {
                {(() => {
                  const filteredTps = tps.filter(t => String(t.grade) === String(formData.grade) && String(t.semester) === String(formData.semester));
                  const filteredTpsIds = filteredTps.map(t => t.id);
-                 const filteredAssessments = assessments.filter(a => filteredTpsIds.includes(a.tpId));
+                 const filteredAssessments = assessments.filter(a => formData.tp_id ? a.tpId === formData.tp_id : filteredTpsIds.includes(a.tpId));
                  
                  return (
                    <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-100/80 rounded-xl">
@@ -553,6 +571,26 @@ const TeacherExams: React.FC = () => {
                     </p>
                 )}
                 {!exam.deadline && <p className="text-[10px] text-slate-400 font-medium">Semester {exam.semester}</p>}
+                 {(exam.tp_id || exam.assessment_id) && (
+                   <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                     {exam.tp_id && (() => {
+                       const parentTp = tps.find(t => t.id === exam.tp_id);
+                       return (
+                         <span className="text-[9px] font-black uppercase text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-100/60 leading-none">
+                           TP: {parentTp ? `${parentTp.code} - ${parentTp.name}` : exam.tp_id}
+                         </span>
+                       );
+                     })()}
+                     {exam.assessment_id && (() => {
+                       const parentAsm = assessments.find(a => a.id === exam.assessment_id);
+                       return (
+                         <span className="text-[9px] font-black uppercase text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100/60 leading-none">
+                           Asesmen: {parentAsm ? parentAsm.name : exam.assessment_id}
+                         </span>
+                       );
+                     })()}
+                   </div>
+                 )}
               </div>
 
               {/* REVISI URUTAN TOMBOL: ACAK -> STATUS -> KELOLA -> EDIT -> HAPUS */}

@@ -1402,57 +1402,8 @@ class DatabaseService {
     }
   }
   async getKunjungan(): Promise<any[]> {
-    let records = this.getLocalTable<any>('kunjungan') || [];
-    if (records.length === 0) {
-      // Seed data kunjungan otomatis jika kosong agar tampilan menarik
-      const students = this.getLocalTable<any>('data_siswa') || [];
-      const pages = ['Beranda', 'Materi PAI', 'Cek Absensi', 'Nilai Siswa', 'Kirim Tugas', 'Kerjakan Soal / Ujian'];
-      const browsers = ['Chrome', 'Safari', 'Firefox', 'Edge', 'Opera'];
-      const devices = ['Mobile', 'Desktop', 'Tablet'];
-      const generated: any[] = [];
-      const now = new Date();
-
-      // Seed 50 data kunjungan
-      for (let i = 0; i < 50; i++) {
-        const student = students.length > 0 ? students[Math.floor(Math.random() * students.length)] : null;
-        let sName = 'Pengunjung Umum';
-        let sNis = 'Anonim';
-        let sKelas = 'Umum';
-
-        if (student) {
-          // Normalisasi manual
-          sName = student.namalengkap || student.nama || 'Siswa PAI';
-          sNis = student.nis || '123456';
-          sKelas = student.kelas || '7.1';
-        }
-
-        const hoursAgo = Math.random() * 72; // s/d 3 hari lalu
-        const timestamp = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000).toISOString();
-        
-        // Atur bobot browser & device acak yang serealistis mungkin
-        const bRand = Math.random();
-        const browser = bRand < 0.65 ? 'Chrome' : (bRand < 0.85 ? 'Safari' : (bRand < 0.92 ? 'Firefox' : (bRand < 0.97 ? 'Edge' : 'Opera')));
-
-        const dRand = Math.random();
-        const device = dRand < 0.70 ? 'Mobile' : (dRand < 0.90 ? 'Desktop' : 'Tablet');
-
-        generated.push({
-          id: 'v_seed_' + Math.random().toString(36).substr(2, 9),
-          nis: sNis,
-          nama: sName,
-          kelas: sKelas,
-          halaman: pages[Math.floor(Math.random() * pages.length)],
-          timestamp,
-          device,
-          browser,
-          duration: Math.floor(Math.random() * 320) + 15 // 15 detik s/d ~6 menit
-        });
-      }
-
-      this.setLocalTable('kunjungan', generated);
-      records = generated;
-    }
-    return records;
+    const records = this.getLocalTable<any>('kunjungan') || [];
+    return records.filter((r: any) => r && r.id && !r.id.startsWith('v_seed_'));
   }
   async resetAllData(): Promise<void> {
     await Promise.all([
