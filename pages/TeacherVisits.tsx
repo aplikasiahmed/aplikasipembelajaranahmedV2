@@ -28,6 +28,7 @@ import {
 import { db } from '../services/supabaseMock';
 import Swal from 'sweetalert2';
 import { Student } from '../types';
+import { generateExcel } from '../utils/excelGenerator';
 
 interface KunjunganRecord {
   id: string;
@@ -250,7 +251,7 @@ const TeacherVisits: React.FC = () => {
   };
 
   // Download Keaktifan ke Excel
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (filteredAnalytics.length === 0) {
       Swal.fire({
         icon: 'info',
@@ -263,35 +264,45 @@ const TeacherVisits: React.FC = () => {
     }
 
     try {
-      let csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += "No,NIS,Nama Lengkap,Kelas,Jumlah Kunjungan,Halaman Terakhir,Aktivitas Terakhir\r\n";
-      
-      filteredAnalytics.forEach((row, index) => {
-        const lastTimeFormatted = row.lastTime ? formatDateTime(row.lastTime).replace(/,/g, '') : '-';
-        csvContent += `${index + 1},'${row.nis},"${row.nama}",${row.kelas},${row.count},"${row.lastHalaman}",${lastTimeFormatted}\r\n`;
-      });
+      const exportData = filteredAnalytics.map((row, index) => ({
+        'NO': index + 1,
+        'NIS': row.nis,
+        'NAMA LENGKAP': row.nama,
+        'KELAS': row.kelas,
+        'JUMLAH KUNJUNGAN': row.count,
+        'HALAMAN TERAKHIR': row.lastHalaman,
+        'AKTIVITAS TERAKHIR': row.lastTime ? formatDateTime(row.lastTime) : '-'
+      }));
 
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Analisis_Kunjungan_Siswa_${selectedKelas}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const success = await generateExcel(
+        exportData, 
+        `Analisis_Kunjungan_Siswa_${selectedKelas}`, 
+        'Keaktifan Siswa',
+        {
+          title: 'LAPORAN STATISTIK KEAKTIFAN SISWA',
+          subTitle: 'PENDIDIKAN AGAMA ISLAM DAN BUDI PEKERTI',
+          kelas: selectedKelas,
+          semester: 'Semua'
+        }
+      );
 
-      Swal.fire({
-        icon: 'success',
-        title: 'Berhasil!',
-        text: 'Data keaktifan siswa berhasil diekspor sebagai dokumen CSV.',
-        timer: 1500,
-        showConfirmButton: false,
-        heightAuto: false
-      });
+      if (success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Berhasil!',
+          text: 'Data keaktifan siswa berhasil diekspor sebagai dokumen Excel.',
+          timer: 1500,
+          showConfirmButton: false,
+          heightAuto: false
+        });
+      } else {
+        throw new Error("Gagal membuat file Excel");
+      }
     } catch (e) {
       Swal.fire({
         icon: 'error',
         title: 'Gagal',
-        text: 'Terjadi kegagalan saat mengekspor data.',
+        text: 'Terjadi kegagalan saat mengekspor data ke Excel.',
         heightAuto: false
       });
     }
@@ -570,7 +581,7 @@ const TeacherVisits: React.FC = () => {
                     className="w-full flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 py-3 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-all active:scale-95 border border-emerald-100"
                   >
                     <FileSpreadsheet size={16} />
-                    Ekspor Excel ke CSV
+                    Ekspor Excel (.xlsx)
                   </button>
                 </div>
               )}

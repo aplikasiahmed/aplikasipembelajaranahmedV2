@@ -72,7 +72,10 @@ const setupWorksheet = (sheet: any, data: any[], meta?: ExcelMeta) => {
             if (key === 'NO') width = 5;
             // REVISI: NIS Dikecilkan jadi 10 (sebelumnya 15)
             else if (key === 'NIS') width = 10;
-            else if (key === 'NAMA SISWA') width = 35;
+            else if (key === 'NAMA SISWA' || key === 'NAMA LENGKAP') width = 35;
+            else if (key === 'JUMLAH KUNJUNGAN') width = 20;
+            else if (key === 'HALAMAN TERAKHIR') width = 25;
+            else if (key === 'AKTIVITAS TERAKHIR') width = 25;
             // REVISI: Kolom Harian 'H-' dibuat sempit (5)
             else if (key.startsWith('H-')) width = 5;
             else if (key === 'TO') width = 8; 
