@@ -14,7 +14,7 @@ const TABS_CONFIG: SheetConfig[] = [
   { name: 'Nilai', headers: ['id', 'student_id', 'subject_type', 'score', 'description', 'kelas', 'semester', 'created_at'] },
   { name: 'kehadiran', headers: ['id', 'student_id', 'nama_siswa', 'nis', 'kelas', 'date', 'status', 'semester'] },
   { name: 'data_TugasSiswa', headers: ['id', 'nisn', 'student_name', 'kelas', 'task_name', 'submission_type', 'content', 'created_at'] },
-  { name: 'materi_belajar', headers: ['id', 'title', 'description', 'grade', 'category', 'content_url', 'thumbnail'] },
+  { name: 'materi_belajar', headers: ['id', 'title', 'description', 'grade', 'category', 'content_url', 'thumbnail', 'semester', 'kelas', 'tp_id', 'text_content'] },
   { name: 'ujian', headers: ['id', 'title', 'grade', 'category', 'semester', 'duration', 'deadline', 'is_random', 'status', 'created_at', 'tp_id', 'assessment_id'] },
   { name: 'bank_soal', headers: ['id', 'exam_id', 'type', 'text', 'image_url', 'options', 'correct_answer'] },
   { name: 'hasil_ujian', headers: ['id', 'exam_id', 'student_nis', 'student_name', 'student_class', 'semester', 'answers', 'score', 'violation_count', 'started_at', 'submitted_at'] },
@@ -1453,42 +1453,8 @@ class DatabaseService {
   }
 
   async getMaterials(grade?: GradeLevel): Promise<Material[]> {
-    let list: Material[] = [];
-    try {
-      const querySnapshot = await getDocs(collection(firestore, 'materi_belajar'));
-      const firestoreList: Material[] = [];
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        firestoreList.push({
-          id: docSnap.id,
-          title: data.title || '',
-          description: data.description || '',
-          grade: data.grade || '7',
-          category: data.category || 'Aqidah',
-          content_url: data.content_url || '',
-          thumbnail: data.thumbnail || '',
-          semester: data.semester || '1',
-          kelas: data.kelas || 'Semua Kelas',
-          tp_id: data.tp_id || '',
-          text_content: data.text_content || '',
-          created_at: data.created_at || new Date().toISOString()
-        } as Material);
-      });
-
-      if (firestoreList.length > 0) {
-        list = firestoreList;
-        // Sinkronisasi data Firestore ke localStorage untuk caching offline
-        this.setLocalTable('materi_belajar', list);
-      } else {
-        list = this.getLocalTable<Material>('materi_belajar');
-      }
-    } catch (err) {
-      console.warn("Gagal menarik data materi dari Firestore, menggunakan fallback LocalStorage:", err);
-      list = this.getLocalTable<Material>('materi_belajar');
-    }
-
+    let list = this.getLocalTable<Material>('materi_belajar');
     list = list.filter(m => m.id !== 'mat-1' && m.id !== 'mat-2');
-
     if (grade) {
       return list.filter(m => m.grade === grade);
     }
@@ -1505,26 +1471,6 @@ class DatabaseService {
     };
     list.push(newMaterial);
     this.setLocalTable('materi_belajar', list);
-
-    try {
-      await setDoc(doc(firestore, 'materi_belajar', id), {
-        title: newMaterial.title || '',
-        description: newMaterial.description || '',
-        grade: newMaterial.grade || '7',
-        category: newMaterial.category || 'Aqidah',
-        content_url: newMaterial.content_url || '',
-        thumbnail: newMaterial.thumbnail || '',
-        semester: newMaterial.semester || '1',
-        kelas: newMaterial.kelas || 'Semua Kelas',
-        tp_id: newMaterial.tp_id || '',
-        text_content: newMaterial.text_content || '',
-        created_at: newMaterial.created_at || new Date().toISOString()
-      });
-      console.log('Materi berhasil disimpan ke Firestore:', id);
-    } catch (err) {
-      console.error('Gagal menyimpan materi ke Firestore:', err);
-    }
-
     return newMaterial;
   }
 
@@ -1537,26 +1483,6 @@ class DatabaseService {
     const updated = { ...list[index], ...data };
     list[index] = updated;
     this.setLocalTable('materi_belajar', list);
-
-    try {
-      await setDoc(doc(firestore, 'materi_belajar', id), {
-        title: updated.title || '',
-        description: updated.description || '',
-        grade: updated.grade || '7',
-        category: updated.category || 'Aqidah',
-        content_url: updated.content_url || '',
-        thumbnail: updated.thumbnail || '',
-        semester: updated.semester || '1',
-        kelas: updated.kelas || 'Semua Kelas',
-        tp_id: updated.tp_id || '',
-        text_content: updated.text_content || '',
-        created_at: updated.created_at || new Date().toISOString()
-      }, { merge: true });
-      console.log('Materi berhasil diperbarui di Firestore:', id);
-    } catch (err) {
-      console.error('Gagal memperbarui materi di Firestore:', err);
-    }
-
     return updated;
   }
 
@@ -1564,13 +1490,6 @@ class DatabaseService {
     const list = this.getLocalTable<Material>('materi_belajar') || [];
     const filtered = list.filter(m => m.id !== id);
     this.setLocalTable('materi_belajar', filtered);
-
-    try {
-      await deleteDoc(doc(firestore, 'materi_belajar', id));
-      console.log('Materi berhasil dihapus dari Firestore:', id);
-    } catch (err) {
-      console.error('Gagal menghapus materi dari Firestore:', err);
-    }
   }
 
   // --- EXAM & QUESTION FUNCTIONS ---
