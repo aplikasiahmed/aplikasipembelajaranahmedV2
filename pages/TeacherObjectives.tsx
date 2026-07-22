@@ -309,6 +309,16 @@ const TeacherObjectives: React.FC = () => {
       });
       return;
     }
+    if (!asmForm.type.trim()) {
+      Swal.fire({ 
+        icon: 'warning', 
+        title: 'Isi Metode / Jenis Penilaian', 
+        text: 'Metode atau jenis penilaian wajib diisi atau dipilih!', 
+        heightAuto: false,
+        confirmButtonColor: '#047857' 
+      });
+      return;
+    }
 
     if (editingAsmId) {
       const updated = assessments.map(a => a.id === editingAsmId ? { ...a, tpId: selectedTpId, name: asmForm.name.trim(), type: asmForm.type } : a);
@@ -742,14 +752,35 @@ const TeacherObjectives: React.FC = () => {
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1 mb-1">Metode / Jenis Penilaian</label>
                 <select 
-                  value={asmForm.type}
-                  onChange={(e) => setAsmForm({ ...asmForm, type: e.target.value })}
+                  value={ASSESSMENT_TYPES.includes(asmForm.type as any) ? asmForm.type : 'Lainnya'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'Lainnya') {
+                      setAsmForm({ ...asmForm, type: '' });
+                    } else {
+                      setAsmForm({ ...asmForm, type: val });
+                    }
+                  }}
                   className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold outline-none focus:bg-white text-slate-700"
                 >
                   {ASSESSMENT_TYPES.map(type => (
                     <option key={type} value={type}>{type}</option>
                   ))}
+                  <option value="Lainnya">Lainnya (Ketik Manual)</option>
                 </select>
+
+                {!ASSESSMENT_TYPES.includes(asmForm.type as any) && (
+                  <div className="mt-2.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1 mb-1 text-emerald-700">Tulis Jenis Penilaian Lainnya</label>
+                    <input 
+                      type="text" 
+                      value={asmForm.type}
+                      onChange={(e) => setAsmForm({ ...asmForm, type: e.target.value })}
+                      placeholder="Masukkan jenis penilaian baru (Contoh: Kuis, Diskusi)"
+                      className="w-full p-3 rounded-xl border border-emerald-200 bg-emerald-50/10 text-xs font-bold outline-none focus:bg-white focus:border-emerald-500 text-slate-800"
+                    />
+                  </div>
+                )}
               </div>
 
               <button 
@@ -816,38 +847,52 @@ const TeacherObjectives: React.FC = () => {
                       {tpRelatedAsms.length === 0 ? (
                         <p className="text-slate-400 text-[10px] italic py-2 pl-1">Belum ada rancangan instrumen penilaian tugas khusus untuk TP ini.</p>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {tpRelatedAsms.map(asm => (
-                            <div key={asm.id} className="bg-white p-3 rounded-xl border border-slate-100 flex items-center justify-between hover:border-emerald-100 transition shadow-sm">
-                              <div className="text-xs">
-                                <p className="font-black text-slate-755">{asm.name}</p>
-                                <span className="text-[7.5px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50 block mt-1 w-max">
+                            <div key={asm.id} className="bg-white p-3.5 rounded-2xl border border-slate-100 flex flex-col justify-between hover:border-emerald-200 hover:shadow-md transition duration-200 shadow-sm min-h-[96px]">
+                              <div>
+                                <p className="font-black text-slate-800 text-xs truncate">{asm.name}</p>
+                              </div>
+                              <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-50">
+                                <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100/50 whitespace-nowrap">
                                   {asm.type}
                                 </span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <button 
-                                  onClick={() => navigate(`/guru/Nilai-rapot?grade=${selectedGrade}&semester=${selectedSemester}`)}
-                                  className="px-2 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-100/50 transition flex items-center gap-1 text-[9px] font-black uppercase tracking-wider"
-                                  title="Input Nilai Tugas"
-                                >
-                                  <Award size={10} />
-                                  <span>Isi Nilai</span>
-                                </button>
-                                <button 
-                                  onClick={() => handleEditAsmInitiate(asm)}
-                                  className="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 border border-transparent hover:border-blue-100/30 transition"
-                                  title="Edit Tugas"
-                                >
-                                  <Edit2 size={12} />
-                                </button>
-                                <button 
-                                  onClick={() => handleDeleteAssessment(asm.id)}
-                                  className="text-slate-400 hover:text-red-650 p-1.5 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100/30 transition"
-                                  title="Hapus Tugas"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  <button 
+                                    onClick={() => navigate(`/guru/nilai`, { 
+                                      state: { 
+                                        prefill: { 
+                                          grade: selectedGrade, 
+                                          semester: selectedSemester, 
+                                          type: (asm.type === 'Praktik' || asm.type === 'Hafalan') ? 'Praktik' : 'Harian',
+                                          tpId: tp.id,
+                                          assessmentId: asm.id
+                                        } 
+                                      } 
+                                    })}
+                                    className="px-2.5 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-100/50 transition flex items-center gap-1 text-[9px] font-black uppercase tracking-wider shadow-sm active:scale-95"
+                                    title="Input Nilai Tugas"
+                                  >
+                                    <Award size={10} />
+                                    <span>Isi Nilai</span>
+                                  </button>
+                                  <div className="flex items-center gap-0.5">
+                                    <button 
+                                      onClick={() => handleEditAsmInitiate(asm)}
+                                      className="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 border border-transparent hover:border-blue-100/30 transition active:scale-90"
+                                      title="Edit Tugas"
+                                    >
+                                      <Edit2 size={12} />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleDeleteAssessment(asm.id)}
+                                      className="text-slate-400 hover:text-red-650 p-1.5 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100/30 transition active:scale-90"
+                                      title="Hapus Tugas"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           ))}

@@ -64,7 +64,13 @@ const TeacherInputGrades: React.FC = () => {
           return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
         });
         setTps(sortedTps);
-        if (filteredTps.length > 0) {
+        
+        // JANGAN reset selectedTpId jika ada prefill yang cocok
+        const state = location.state as any;
+        const prefillTpId = state?.prefill?.tpId;
+        if (prefillTpId && filteredTps.some((t: any) => t.id === prefillTpId)) {
+          setSelectedTpId(prefillTpId);
+        } else if (filteredTps.length > 0) {
           setSelectedTpId(filteredTps[0].id);
         } else {
           setSelectedTpId('');
@@ -83,17 +89,22 @@ const TeacherInputGrades: React.FC = () => {
     } else {
       setAssessments([]);
     }
-  }, [grade, semester]);
+  }, [grade, semester, location.state]);
 
   const currentTpAssessments = assessments.filter((a: any) => a.tpId === selectedTpId);
 
   useEffect(() => {
-    if (currentTpAssessments.length > 0) {
+    const state = location.state as any;
+    const prefillAssessmentId = state?.prefill?.assessmentId;
+    
+    if (prefillAssessmentId && currentTpAssessments.some((a: any) => a.id === prefillAssessmentId)) {
+      setSelectedAssessmentId(prefillAssessmentId);
+    } else if (currentTpAssessments.length > 0) {
       setSelectedAssessmentId(currentTpAssessments[0].id);
     } else {
       setSelectedAssessmentId('');
     }
-  }, [selectedTpId, assessments]);
+  }, [selectedTpId, assessments, location.state]);
 
   // Load Kelas berdasarkan Jenjang (Untuk Form Manual)
   // FIX: Tambahkan logika cek prefill agar tidak menimpa kelas yang dikirim
@@ -162,7 +173,7 @@ const TeacherInputGrades: React.FC = () => {
     }
   }, [importKelas, importSemester, importType]);
 
-  // --- LOGIKA AUTO-FILL DARI CEK TUGAS (FIXED) ---
+  // --- LOGIKA AUTO-FILL DARI CEK TUGAS ATAU PETA EVALUASI (FIXED) ---
   useEffect(() => {
       const state = location.state as any;
       if (state?.prefill) {
@@ -176,6 +187,30 @@ const TeacherInputGrades: React.FC = () => {
              }
              // Paksa set selectedKelas agar trigger useEffect load siswa
              setSelectedKelas(p.kelas);
+          } else if (p.grade) {
+             if (['7','8','9'].includes(String(p.grade))) {
+                 setGrade(String(p.grade) as GradeLevel);
+             }
+          }
+
+          // Set Semester
+          if (p.semester) {
+             setSemester(p.semester);
+          }
+
+          // Set Type
+          if (p.type) {
+             setType(p.type);
+          }
+
+          // Set selectedTpId
+          if (p.tpId) {
+             setSelectedTpId(p.tpId);
+          }
+
+          // Set selectedAssessmentId
+          if (p.assessmentId) {
+             setSelectedAssessmentId(p.assessmentId);
           }
 
           // 2. Set Tanggal (FIX: Gunakan format lokal YYYY-MM-DD agar tidak mundur sehari)
@@ -187,6 +222,13 @@ const TeacherInputGrades: React.FC = () => {
                 const day = String(d.getDate()).padStart(2, '0');
                 setDate(`${year}-${month}-${day}`);
              } catch (e) { console.error("Invalid date", e); }
+          } else {
+             // Default date to today if none specified
+             const today = new Date();
+             const year = today.getFullYear();
+             const month = String(today.getMonth() + 1).padStart(2, '0');
+             const day = String(today.getDate()).padStart(2, '0');
+             setDate(`${year}-${month}-${day}`);
           }
 
           // 3. Set Keterangan (Dari Judul Tugas)

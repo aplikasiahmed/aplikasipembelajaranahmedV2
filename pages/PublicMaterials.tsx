@@ -561,10 +561,10 @@ const PublicMaterials: React.FC = () => {
                 <span className="text-[10px] text-slate-400 font-bold italic text-center sm:text-left">
                   {isCompleted 
                     ? '✓ Materi ini sudah kamu tandai selesai dibaca.' 
-                    : '*Klik tombol di samping untuk mengoleksi lencana selesai membaca!'}
+                    : '*Klik tombol "Tandai Selesai" untuk mengoleksi lencana selesai membaca!'}
                 </span>
                 
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                   {!isCompleted ? (
                     <button
                       onClick={() => handleMarkAsCompleted(selectedMaterial.id)}
@@ -574,7 +574,7 @@ const PublicMaterials: React.FC = () => {
                       Tandai Selesai Dibaca
                     </button>
                   ) : (
-                    <span className="bg-emerald-100 text-emerald-800 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider border border-emerald-200 flex items-center gap-1.5 animate-pulse">
+                    <span className="w-full sm:w-auto bg-emerald-100 text-emerald-800 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border border-emerald-200 flex items-center justify-center gap-1.5 animate-pulse">
                       <CheckCircle size={14} />
                       Selesai Dibaca
                     </span>
@@ -582,7 +582,7 @@ const PublicMaterials: React.FC = () => {
                   
                   <button
                     onClick={() => setSelectedMaterial(null)}
-                    className="w-full sm:w-auto px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md transition-all active:scale-95 text-center"
+                    className="w-full sm:w-auto px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md transition-all active:scale-95 text-center flex items-center justify-center"
                   >
                     Tutup
                   </button>
