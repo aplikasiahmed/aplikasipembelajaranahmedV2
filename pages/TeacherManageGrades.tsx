@@ -61,6 +61,18 @@ const ASSESSMENT_TYPES = ['Hafalan', 'Penulisan', 'Praktik', 'Proyek', 'Observas
 const TeacherManageGrades: React.FC = () => {
   const navigate = useNavigate();
 
+  const kkmValue = Number(localStorage.getItem('pai_kkm') || '71');
+  const getKkmIntervals = (kkm: number) => {
+    const range = 100 - kkm;
+    const step = range / 3;
+    return {
+      cMin: kkm,
+      bMin: Math.ceil(kkm + step),
+      aMin: Math.ceil(kkm + 2 * step)
+    };
+  };
+  const { cMin, bMin, aMin } = getKkmIntervals(kkmValue);
+
   // --- APP STATE ---
   const [activeTab, setActiveTab] = useState<'input' | 'rekap'>('input');
   const [selectedGrade, setSelectedGrade] = useState<string>('7');
@@ -829,9 +841,9 @@ const TeacherManageGrades: React.FC = () => {
   const getPredicateAndDesc = (score: number | null, studentId?: string): { pred: string; desc: string } => {
     if (score === null) return { pred: '-', desc: '-' };
     let pred = 'D';
-    if (score >= 91) pred = 'A';
-    else if (score >= 81) pred = 'B';
-    else if (score >= 71) pred = 'C';
+    if (score >= aMin) pred = 'A';
+    else if (score >= bMin) pred = 'B';
+    else if (score >= cMin) pred = 'C';
 
     const fallbackDesc: Record<string, string> = {
       'A': 'Menunjukkan penguasaan materi yang sangat baik pada seluruh tujuan pembelajaran.',
@@ -1808,7 +1820,7 @@ const TeacherManageGrades: React.FC = () => {
 
                         {/* Live computations metrics */}
                         <td className="p-3 bg-emerald-50 text-center border-l">
-                          <span className={`text-sm font-black ${calculs.finalScore !== null && calculs.finalScore < 71 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                          <span className={`text-sm font-black ${calculs.finalScore !== null && calculs.finalScore < kkmValue ? 'text-rose-600' : 'text-emerald-700'}`}>
                             {calculs.finalScore !== null ? calculs.finalScore : '-'}
                           </span>
                         </td>

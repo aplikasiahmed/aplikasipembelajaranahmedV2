@@ -14,7 +14,10 @@ import {
   AlertTriangle,
   Files,
   Filter,
-  RefreshCw
+  RefreshCw,
+  Target,
+  TrendingUp,
+  Award
 } from 'lucide-react';
 import { db } from '../services/supabaseMock';
 import Swal from 'sweetalert2';
@@ -30,6 +33,18 @@ const TeacherReports: React.FC = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [availKelas, setAvailKelas] = useState<string[]>([]);
+
+  const kkmValue = Number(localStorage.getItem('pai_kkm') || '71');
+  const getKkmIntervals = (kkm: number) => {
+    const range = 100 - kkm;
+    const step = range / 3;
+    return {
+      cMin: kkm,
+      bMin: Math.ceil(kkm + step),
+      aMin: Math.ceil(kkm + 2 * step)
+    };
+  };
+  const { cMin, bMin, aMin } = getKkmIntervals(kkmValue);
   
   // States Konfigurasi NILAI
   const [kelasNilai, setKelasNilai] = useState('');
@@ -45,6 +60,115 @@ const TeacherReports: React.FC = () => {
 
   const [appsScriptUrl, setAppsScriptUrl] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+
+  // KKM Analysis State variables
+  const [kkmKelas, setKkmKelas] = useState('');
+  const [kkmSemester, setKkmSemester] = useState('');
+  const [kkmTargetValue, setKkmTargetValue] = useState(() => {
+    return Number(localStorage.getItem('pai_kkm') || '75');
+  });
+  const [kkmResults, setKkmResults] = useState<any[]>([]);
+  const [loadingKkm, setLoadingKkm] = useState(false);
+
+  const calculateKkmAnalysis = async () => {
+    if (!kkmKelas || !kkmSemester) {
+      setKkmResults([]);
+      return;
+    }
+    setLoadingKkm(true);
+    try {
+      // 1. Fetch students
+      const students = await db.getStudentsByKelas(kkmKelas);
+      if (!students || students.length === 0) {
+        setKkmResults([]);
+        setLoadingKkm(false);
+        return;
+      }
+
+      // 2. Fetch TPs and scores
+      const tpsList = db.getLocalTable<any>('tujuan_pembelajaran');
+      const assessmentsList = db.getLocalTable<any>('asesmen_tp');
+
+      const savedTpScores = localStorage.getItem('pai_grades_tp_scores');
+      const tpScores: Record<string, number> = savedTpScores ? JSON.parse(savedTpScores) : {};
+
+      // Parse grade Level from class name
+      const match = kkmKelas.match(/\d+/);
+      const gradeLevel = match ? match[0] : '7';
+
+      const activeTps = tpsList
+        .filter((t: any) => String(t.grade) === String(gradeLevel) && String(t.semester) === String(kkmSemester))
+        .sort((a: any, b: any) => {
+          const codeA = String(a.code || '').toLowerCase();
+          const codeB = String(b.code || '').toLowerCase();
+          return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+      if (activeTps.length === 0) {
+        setKkmResults([]);
+        setLoadingKkm(false);
+        return;
+      }
+
+      // 3. Evaluate each TP
+      const results = activeTps.map((tp: any) => {
+        let reachedCount = 0;
+        let evaluatedCount = 0;
+        const studentScores: number[] = [];
+
+        students.forEach((s: any) => {
+          const studentId = s.id;
+          const relatedAsms = assessmentsList.filter((a: any) => a.tpId === tp.id);
+          if (relatedAsms.length > 0) {
+            let sum = 0;
+            let count = 0;
+            relatedAsms.forEach((asm: any) => {
+              const scoreKey = `${studentId}_${asm.id}`;
+              const scoreVal = tpScores[scoreKey];
+              if (scoreVal !== undefined && scoreVal !== null && scoreVal !== '') {
+                sum += Number(scoreVal);
+                count++;
+              }
+            });
+
+            if (count > 0) {
+              const score = parseFloat((sum / count).toFixed(1));
+              studentScores.push(score);
+              evaluatedCount++;
+              if (score >= kkmTargetValue) {
+                reachedCount++;
+              }
+            }
+          }
+        });
+
+        const percentage = evaluatedCount > 0 ? Math.round((reachedCount / evaluatedCount) * 100) : 0;
+        const avgScore = studentScores.length > 0 ? parseFloat((studentScores.reduce((a, b) => a + b, 0) / studentScores.length).toFixed(1)) : 0;
+
+        return {
+          id: tp.id,
+          code: tp.code || `TP ${tp.id}`,
+          name: tp.name || tp.description,
+          totalStudents: students.length,
+          evaluatedCount,
+          reachedCount,
+          percentage,
+          avgScore
+        };
+      });
+
+      setKkmResults(results);
+    } catch (err) {
+      console.error('Error calculating KKM analysis:', err);
+    } finally {
+      setLoadingKkm(false);
+    }
+  };
+
+  useEffect(() => {
+    calculateKkmAnalysis();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kkmKelas, kkmSemester, kkmTargetValue]);
 
   useEffect(() => {
     fetchAllKelas();
@@ -270,9 +394,9 @@ const TeacherReports: React.FC = () => {
     const getPredicateAndDesc = (score: number | null, studentId: string): { pred: string; desc: string } => {
       if (score === null) return { pred: '-', desc: '-' };
       let pred = 'D';
-      if (score >= 91) pred = 'A';
-      else if (score >= 81) pred = 'B';
-      else if (score >= 71) pred = 'C';
+      if (score >= aMin) pred = 'A';
+      else if (score >= bMin) pred = 'B';
+      else if (score >= cMin) pred = 'C';
 
       const fallbackDesc: Record<string, string> = {
         'A': 'Menunjukkan penguasaan materi yang sangat baik pada seluruh tujuan pembelajaran.',
@@ -301,13 +425,13 @@ const TeacherReports: React.FC = () => {
       const minEval = tpEvaluations[tpEvaluations.length - 1];
 
       let desc = '';
-      if (maxEval.score >= 75) {
+      if (maxEval.score >= kkmValue) {
         desc += `Sangat memahami ${maxEval.tp.name || maxEval.tp.description}`;
       } else {
         desc += `Cukup memahami ${maxEval.tp.name || maxEval.tp.description}`;
       }
 
-      if (minEval && minEval.tp.id !== maxEval.tp.id && minEval.score < 80) {
+      if (minEval && minEval.tp.id !== maxEval.tp.id && minEval.score < bMin) {
         desc += `, namun masih perlu bimbingan/peningkatan dalam hal ${minEval.tp.name || minEval.tp.description}.`;
       } else {
         desc += `, serta konsisten menunjukkan penguasaan yang baik pada seluruh indikator lainnya.`;
@@ -970,8 +1094,159 @@ const TeacherReports: React.FC = () => {
                 *Rekap kehadiran seluruh kelas sesuai rentang bulan.
              </p>
           </div>
-       </div>
-     </div>
+        </div>
+      </div>
+
+      {/* ==============================================
+          KARTU 3: ANALISIS KKM PER TUJUAN PEMBELAJARAN
+          ============================================== */}
+      <div className="bg-white p-4 md:p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-50 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><TrendingUp size={18}/></div>
+            <div>
+              <h2 className="text-[11px] md:text-sm font-black uppercase tracking-widest text-slate-800">Analisis Ketercapaian KKM Per TP</h2>
+              <p className="text-[9px] text-slate-400 font-medium">Mengukur persentase siswa mencapai target KKM pada setiap Tujuan Pembelajaran.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider self-start sm:self-center">
+            <Target size={12} className="text-emerald-600 animate-pulse" /> Target KKM: {kkmTargetValue}
+          </div>
+        </div>
+
+        {/* KKM SELECTION CONTROLS */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+          <div className="space-y-1">
+            <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Kelas</label>
+            <select 
+              className="w-full p-2.5 text-[10px] md:text-xs border border-slate-200 rounded-xl font-normal outline-none bg-white text-slate-900"
+              value={kkmKelas} 
+              onChange={(e) => setKkmKelas(e.target.value)}
+            >
+              <option value="">-- Pilih Kelas --</option>
+              {availKelas.map(k => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Semester</label>
+            <select 
+              className="w-full p-2.5 text-[10px] md:text-xs border border-slate-200 rounded-xl font-normal outline-none bg-white text-slate-900"
+              value={kkmSemester} 
+              onChange={(e) => setKkmSemester(e.target.value)}
+            >
+              <option value="">-- Pilih Semester --</option>
+              <option value="1">1 (Ganjil)</option>
+              <option value="2">2 (Genap)</option>
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Sesuaikan Batas KKM</label>
+            <div className="flex items-center gap-2">
+              <input 
+                type="range" 
+                min="50" 
+                max="100" 
+                value={kkmTargetValue} 
+                onChange={(e) => setKkmTargetValue(Number(e.target.value))}
+                className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+              />
+              <input 
+                type="number" 
+                min="50" 
+                max="100" 
+                value={kkmTargetValue} 
+                onChange={(e) => setKkmTargetValue(Math.min(100, Math.max(50, Number(e.target.value))))}
+                className="w-12 p-1.5 text-center text-[10px] md:text-xs border border-slate-200 rounded-lg font-bold bg-white text-slate-900"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* KKM ANALYSIS LIST RESULTS */}
+        {loadingKkm ? (
+          <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
+            <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-[10px] font-black uppercase tracking-wider">Menghitung Ketercapaian...</span>
+          </div>
+        ) : kkmKelas && kkmSemester ? (
+          kkmResults.length === 0 ? (
+            <div className="py-10 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 space-y-1">
+              <div className="text-slate-300 flex justify-center"><Target size={36} /></div>
+              <p className="text-xs text-slate-500 font-bold">Tidak ada data Tujuan Pembelajaran atau nilai aktif.</p>
+              <p className="text-[10px] text-slate-400">Pastikan Tujuan Pembelajaran telah diatur untuk Kelas & Semester ini.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {kkmResults.map((tp) => {
+                  const isHigh = tp.percentage >= 75;
+                  const isLow = tp.percentage < 50;
+                  const colorClass = isHigh 
+                    ? 'text-emerald-700 bg-emerald-50 border-emerald-100' 
+                    : isLow 
+                      ? 'text-rose-700 bg-rose-50 border-rose-100' 
+                      : 'text-amber-700 bg-amber-50 border-amber-100';
+                  
+                  const barColor = isHigh 
+                    ? 'bg-emerald-600' 
+                    : isLow 
+                      ? 'bg-rose-500' 
+                      : 'bg-amber-500';
+
+                  return (
+                    <div key={tp.id} className="p-4 rounded-2xl border border-slate-100 hover:border-slate-200 transition-all bg-white space-y-3 shadow-sm flex flex-col justify-between">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="bg-slate-100 text-slate-700 font-black text-[9px] px-2.5 py-0.5 rounded-lg border border-slate-200 uppercase tracking-wider">
+                            {tp.code}
+                          </span>
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border ${colorClass} flex items-center gap-1`}>
+                            <Award size={10} /> {tp.percentage}% Tuntas
+                          </span>
+                        </div>
+                        <p className="text-slate-800 text-[11px] font-bold leading-normal line-clamp-2" title={tp.name}>
+                          {tp.name}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2 pt-2 border-t border-slate-50">
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-center text-[9px] font-bold text-slate-400">
+                            <span>Rata-Rata Kelas: <strong className="text-slate-700 font-black">{tp.avgScore}</strong></span>
+                            <span>{tp.reachedCount} dari {tp.evaluatedCount} Siswa</span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                              style={{ width: `${tp.percentage}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="p-3.5 bg-emerald-50 text-emerald-800 border border-emerald-100/50 rounded-2xl flex items-start gap-2.5 text-[10px] md:text-xs font-bold leading-normal">
+                <Info size={16} className="shrink-0 text-emerald-600 mt-0.5" />
+                <p>
+                  Siswa dinyatakan tuntas pada Tujuan Pembelajaran (TP) apabila nilai rata-rata asesmen formatif & sumatif harian mereka mencapai atau melampaui batas KKM (<strong className="text-emerald-950 font-black">{kkmTargetValue}</strong>). 
+                  Gunakan slider/input di atas untuk menganalisis ketercapaian siswa secara fleksibel sesuai target kelulusan dinamis.
+                </p>
+              </div>
+            </div>
+          )
+        ) : (
+          <div className="py-12 text-center bg-slate-50/50 rounded-3xl border border-dashed border-slate-200 space-y-1">
+            <div className="text-slate-400 flex justify-center animate-pulse"><Target size={36} /></div>
+            <p className="text-xs text-slate-500 font-bold">Pilih kelas dan semester terlebih dahulu</p>
+            <p className="text-[10px] text-slate-400">Untuk memulai analisis ketersediaan ketercapaian ketuntasan minimal (KKM).</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

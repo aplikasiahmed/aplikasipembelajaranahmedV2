@@ -18,6 +18,9 @@ const PublicExam: React.FC = () => {
   const [loadingExams, setLoadingExams] = useState(false);
   const [loadingLogin, setLoadingLogin] = useState(false);
   
+  // Notification system - track read exams
+  const [readExamIds, setReadExamIds] = useState<string[]>([]);
+
   // UI State
   const [showLoginModal, setShowLoginModal] = useState(false); // NEW: Modal Login State
 
@@ -59,6 +62,15 @@ const PublicExam: React.FC = () => {
         setLoadingExams(false);
     };
     fetchActiveExams();
+
+    const readStr = localStorage.getItem('pai_read_exams');
+    if (readStr) {
+      try {
+        setReadExamIds(JSON.parse(readStr));
+      } catch (e) {
+        console.warn(e);
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -118,6 +130,19 @@ const PublicExam: React.FC = () => {
       setLoginSemester('0'); // Reset Semester
       setLoadingLogin(false); // Reset Loading State agar tidak stuck jika sebelumnya cancel
       setShowLoginModal(true); // Tampilkan Modal Login
+
+      try {
+        const readList = JSON.parse(localStorage.getItem('pai_read_exams') || '[]');
+        if (!readList.includes(exam.id)) {
+          readList.push(exam.id);
+          localStorage.setItem('pai_read_exams', JSON.stringify(readList));
+          setReadExamIds(readList);
+          // Dispatch custom event to notify other components (like Home.tsx or BottomNav.tsx)
+          window.dispatchEvent(new Event('pai_notifications_updated'));
+        }
+      } catch (e) {
+        console.error(e);
+      }
   };
 
   const handleCloseLoginModal = () => {
@@ -515,6 +540,12 @@ const PublicExam: React.FC = () => {
                              <Timer size={12} />
                              <span className="text-[10px] font-black uppercase">Durasi {exam.duration} Menit</span>
                           </div>
+
+                          {!isExpired && !readExamIds.includes(exam.id) && (
+                            <div className="bg-red-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-md animate-pulse shadow-sm">
+                              Baru
+                            </div>
+                          )}
                       </div>
 
                       <h3 className={`font-bold text-sm uppercase leading-tight ${isExpired ? 'text-slate-400' : 'text-slate-800'}`}>{exam.title}</h3>

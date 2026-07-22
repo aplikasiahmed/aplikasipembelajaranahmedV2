@@ -5,6 +5,18 @@ import { Student, GradeRecord } from '../types';
 import Swal from 'sweetalert2';
 
 const PublicGrades: React.FC = () => {
+  const kkmValue = Number(localStorage.getItem('pai_kkm') || '71');
+  const getKkmIntervals = (kkm: number) => {
+    const range = 100 - kkm;
+    const step = range / 3;
+    return {
+      cMin: kkm,
+      bMin: Math.ceil(kkm + step),
+      aMin: Math.ceil(kkm + 2 * step)
+    };
+  };
+  const { cMin, bMin, aMin } = getKkmIntervals(kkmValue);
+
   const [nis, setNis] = useState('');
   const [semester, setSemester] = useState('0'); // Default '0' agar muncul "Pilih Semester"
   const [student, setStudent] = useState<Student | null>(null);
@@ -295,9 +307,9 @@ const PublicGrades: React.FC = () => {
   const getStudentPredicateAndDesc = (finalScore: number | null): { pred: string; desc: string } => {
     if (finalScore === null) return { pred: '-', desc: '-' };
     let pred = 'D';
-    if (finalScore >= 91) pred = 'A';
-    else if (finalScore >= 81) pred = 'B';
-    else if (finalScore >= 71) pred = 'C';
+    if (finalScore >= aMin) pred = 'A';
+    else if (finalScore >= bMin) pred = 'B';
+    else if (finalScore >= cMin) pred = 'C';
 
     const fallbackDesc: Record<string, string> = {
       'A': 'Menunjukkan penguasaan materi yang sangat baik pada seluruh tujuan pembelajaran.',

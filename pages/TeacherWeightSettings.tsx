@@ -36,8 +36,9 @@ const TeacherWeightSettings: React.FC = () => {
     kehadiran: 10, 
     sikap: 15 
   });
+  const [kkm, setKkm] = useState<number>(71);
 
-  // Load weights from localStorage on mount
+  // Load weights and KKM from localStorage on mount
   useEffect(() => {
     const savedWeights = localStorage.getItem('pai_grade_weights');
     if (savedWeights) {
@@ -53,6 +54,11 @@ const TeacherWeightSettings: React.FC = () => {
       } catch (e) { 
         console.error("Gagal meload bobot penilaian:", e); 
       }
+    }
+
+    const savedKkm = localStorage.getItem('pai_kkm');
+    if (savedKkm) {
+      setKkm(Number(savedKkm));
     }
   }, []);
 
@@ -77,11 +83,25 @@ const TeacherWeightSettings: React.FC = () => {
 
     // Simpan ke localStorage
     localStorage.setItem('pai_grade_weights', JSON.stringify(weights));
+    localStorage.setItem('pai_kkm', String(kkm));
     
     Swal.fire({ 
       icon: 'success', 
       title: 'Skema Bobot Disimpan', 
       text: 'Perubahan ini telah diterapkan dan langsung memengaruhi kalkulasi nilai rapor seluruh kelas.',
+      timer: 3000, 
+      showConfirmButton: true, 
+      confirmButtonColor: '#059669',
+      heightAuto: false 
+    });
+  };
+
+  const handleSaveKkmOnly = () => {
+    localStorage.setItem('pai_kkm', String(kkm));
+    Swal.fire({ 
+      icon: 'success', 
+      title: 'Batas KKM Diperbarui', 
+      text: `Nilai KKM berhasil diatur menjadi ${kkm} dan otomatis diterapkan ke seluruh interval predikat rapor siswa.`,
       timer: 3000, 
       showConfirmButton: true, 
       confirmButtonColor: '#059669',
@@ -95,6 +115,10 @@ const TeacherWeightSettings: React.FC = () => {
       const newVal = Math.max(0, Math.min(100, current + amount));
       return { ...prev, [key]: newVal };
     });
+  };
+
+  const adjustKkm = (amount: number) => {
+    setKkm(prev => Math.max(50, Math.min(100, prev + amount)));
   };
 
   const resetToDefault = () => {
@@ -429,6 +453,74 @@ const TeacherWeightSettings: React.FC = () => {
               </button>
             </div>
 
+          </div>
+
+          {/* PANEL PENGATURAN KKM */}
+          <div className="bg-white p-5 md:p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Award className="text-slate-400" size={18} />
+                <h2 className="text-xs md:text-sm font-black text-slate-800 uppercase tracking-widest">
+                  Panel Pengaturan KKM Rapor
+                </h2>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 hover:bg-white p-4 rounded-2xl border border-slate-100/70 hover:border-emerald-200 hover:shadow-sm transition-all duration-300">
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-emerald-100 text-emerald-800 rounded-lg">
+                    <Award size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                      Kriteria Ketuntasan Minimal (KKM)
+                    </h3>
+                    <p className="text-[9px] text-slate-400">Nilai batas ketuntasan minimum untuk hasil rapor siswa</p>
+                  </div>
+                </div>
+                <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-100">
+                  {kkm}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-4 mt-2">
+                <button 
+                  onClick={() => adjustKkm(-1)}
+                  className="p-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition"
+                  type="button"
+                >
+                  <Minus size={14} />
+                </button>
+                <input 
+                  type="range" 
+                  min="50" 
+                  max="100" 
+                  step="1"
+                  value={kkm}
+                  onChange={(e) => setKkm(parseInt(e.target.value))}
+                  className="flex-1 accent-emerald-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg appearance-none"
+                />
+                <button 
+                  onClick={() => adjustKkm(1)}
+                  className="p-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition"
+                  type="button"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button 
+                onClick={handleSaveKkmOnly}
+                className="w-full py-3.5 px-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white cursor-pointer"
+                id="btn-save-kkm"
+              >
+                <Save size={16} />
+                <span>Simpan Nilai KKM</span>
+              </button>
+            </div>
           </div>
         </div>
 

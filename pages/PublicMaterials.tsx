@@ -59,7 +59,10 @@ const PublicMaterials: React.FC = () => {
   // Reader Font Size (px)
   const [readerFontSize, setReaderFontSize] = useState<number>(16);
 
-  // Load completed read list from local storage on mount
+  // Read materials tracking for notification system
+  const [readMaterialIds, setReadMaterialIds] = useState<string[]>([]);
+
+  // Load completed and read lists from local storage on mount
   useEffect(() => {
     const listStr = localStorage.getItem('pai_completed_read_materials');
     if (listStr) {
@@ -69,7 +72,33 @@ const PublicMaterials: React.FC = () => {
         console.warn(e);
       }
     }
+
+    const readStr = localStorage.getItem('pai_read_materials');
+    if (readStr) {
+      try {
+        setReadMaterialIds(JSON.parse(readStr));
+      } catch (e) {
+        console.warn(e);
+      }
+    }
   }, []);
+
+  const handleSelectMaterial = (mat: Material) => {
+    setSelectedMaterial(mat);
+    
+    try {
+      const readList = JSON.parse(localStorage.getItem('pai_read_materials') || '[]');
+      if (!readList.includes(mat.id)) {
+        readList.push(mat.id);
+        localStorage.setItem('pai_read_materials', JSON.stringify(readList));
+        setReadMaterialIds(readList);
+        // Dispatch custom event to notify other components (like Home.tsx or BottomNav.tsx)
+        window.dispatchEvent(new Event('pai_notifications_updated'));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const handleMarkAsCompleted = (id: string) => {
     let updated = [...completedReadIds];
@@ -279,7 +308,7 @@ const PublicMaterials: React.FC = () => {
                     className={`bg-white rounded-[2rem] border shadow-sm overflow-hidden flex flex-col justify-between group hover:shadow-md transition-all duration-300 cursor-pointer relative ${
                       isCompleted ? 'border-emerald-200 bg-emerald-50/5' : 'border-slate-100'
                     }`}
-                    onClick={() => setSelectedMaterial(mat)}
+                    onClick={() => handleSelectMaterial(mat)}
                   >
                     <div>
                       {/* Image Thumbnail */}
@@ -328,6 +357,11 @@ const PublicMaterials: React.FC = () => {
                           <span className="bg-indigo-50 text-indigo-800 font-extrabold text-[9px] px-2 py-0.5 rounded-lg border border-indigo-100">
                             {mat.kelas || 'Semua Kelas'}
                           </span>
+                          {!readMaterialIds.includes(mat.id) && (
+                            <span className="bg-red-500 text-white font-black text-[9px] px-2 py-0.5 rounded-lg flex items-center gap-0.5 animate-pulse shadow-[0_2px_8px_rgba(239,68,68,0.3)]">
+                              BARU
+                            </span>
+                          )}
                           {isCompleted && (
                             <span className="bg-amber-50 text-amber-800 font-black text-[9px] px-2 py-0.5 rounded-lg border border-amber-100 flex items-center gap-0.5 animate-pulse">
                               <Sparkles size={8} />
