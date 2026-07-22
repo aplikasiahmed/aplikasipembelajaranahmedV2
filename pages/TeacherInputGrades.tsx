@@ -40,9 +40,11 @@ const TeacherInputGrades: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null); // 2. Tambahan State File Terpilih
   const [allClassesList, setAllClassesList] = useState<string[]>([]); // Semua kelas (7A-9I)
   const [importType, setImportType] = useState(''); // Default kosong untuk "Pilih Jenis Tugas"
+  const [importTpId, setImportTpId] = useState(''); // State untuk Tujuan Pembelajaran Import
+  const [importTps, setImportTps] = useState<any[]>([]); // List of TPs for current import grade/sem
   const [importAssessmentId, setImportAssessmentId] = useState(''); // Default kosong untuk "Pilih Penilaian/Tugas"
   const [importDesc, setImportDesc] = useState(''); // Keterangan untuk PTS/UAS
-  const [importAssessments, setImportAssessments] = useState<any[]>([]); // List of Assessments for current import grade/sem
+  const [importAssessments, setImportAssessments] = useState<any[]>([]); // List of Assessments for current import grade/sem/tp
 
   const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
 
@@ -139,19 +141,47 @@ const TeacherInputGrades: React.FC = () => {
     });
   }, []);
 
-  // Load TPs and Assessments for selected importKelas & importSemester to assist validation
+  // Load TPs for selected importKelas & importSemester
   useEffect(() => {
     const importGrade = importKelas ? importKelas.charAt(0) : '';
     const allTps = db.getLocalTable<any>('tujuan_pembelajaran');
-    const allAsms = db.getLocalTable<any>('asesmen_tp');
     
-    if (allTps && allAsms && importGrade && importSemester) {
+    if (allTps && importGrade && importSemester) {
       try {
         const filteredTps = allTps.filter((t: any) => String(t.grade) === String(importGrade) && String(t.semester) === String(importSemester));
-        const tpIds = filteredTps.map((t: any) => t.id);
-        
+        const sortedTps = [...filteredTps].sort((a: any, b: any) => {
+          const codeA = a.code || '';
+          const codeB = b.code || '';
+          return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        setImportTps(sortedTps);
+
+        const state = location.state as any;
+        const prefillTpId = state?.prefill?.tpId;
+        if (prefillTpId && sortedTps.some((t: any) => t.id === prefillTpId)) {
+          setImportTpId(prefillTpId);
+        } else if (sortedTps.length > 0) {
+          setImportTpId(sortedTps[0].id);
+        } else {
+          setImportTpId('');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      setImportTps([]);
+      setImportTpId('');
+    }
+  }, [importKelas, importSemester, location.state]);
+
+  // Load Assessments for selected importTpId & importType
+  useEffect(() => {
+    const allAsms = db.getLocalTable<any>('asesmen_tp');
+    
+    if (allAsms && importTpId) {
+      try {
         const filteredAsms = allAsms.filter((a: any) => {
-          const matchesTp = tpIds.includes(a.tpId);
+          const matchesTp = a.tpId === importTpId;
           if (!matchesTp) return false;
           if (importType === 'Praktik') return a.type === 'Praktik' || a.type === 'Hafalan';
           if (importType === 'Harian') return a.type !== 'Praktik' && a.type !== 'Hafalan';
@@ -159,7 +189,12 @@ const TeacherInputGrades: React.FC = () => {
         });
         
         setImportAssessments(filteredAsms);
-        if (filteredAsms.length > 0) {
+
+        const state = location.state as any;
+        const prefillAssessmentId = state?.prefill?.assessmentId;
+        if (prefillAssessmentId && filteredAsms.some((a: any) => a.id === prefillAssessmentId)) {
+          setImportAssessmentId(prefillAssessmentId);
+        } else if (filteredAsms.length > 0) {
           setImportAssessmentId(filteredAsms[0].id);
         } else {
           setImportAssessmentId('');
@@ -171,7 +206,7 @@ const TeacherInputGrades: React.FC = () => {
       setImportAssessments([]);
       setImportAssessmentId('');
     }
-  }, [importKelas, importSemester, importType]);
+  }, [importTpId, importType, location.state]);
 
   // --- LOGIKA AUTO-FILL DARI CEK TUGAS ATAU PETA EVALUASI (FIXED) ---
   useEffect(() => {
@@ -187,6 +222,7 @@ const TeacherInputGrades: React.FC = () => {
              }
              // Paksa set selectedKelas agar trigger useEffect load siswa
              setSelectedKelas(p.kelas);
+             setImportKelas(p.kelas);
           } else if (p.grade) {
              if (['7','8','9'].includes(String(p.grade))) {
                  setGrade(String(p.grade) as GradeLevel);
@@ -196,21 +232,25 @@ const TeacherInputGrades: React.FC = () => {
           // Set Semester
           if (p.semester) {
              setSemester(p.semester);
+             setImportSemester(p.semester);
           }
 
           // Set Type
           if (p.type) {
              setType(p.type);
+             setImportType(p.type === 'Praktik' ? 'Praktik' : 'Harian');
           }
 
           // Set selectedTpId
           if (p.tpId) {
              setSelectedTpId(p.tpId);
+             setImportTpId(p.tpId);
           }
 
           // Set selectedAssessmentId
           if (p.assessmentId) {
              setSelectedAssessmentId(p.assessmentId);
+             setImportAssessmentId(p.assessmentId);
           }
 
           // 2. Set Tanggal (FIX: Gunakan format lokal YYYY-MM-DD agar tidak mundur sehari)
@@ -220,7 +260,9 @@ const TeacherInputGrades: React.FC = () => {
                 const year = d.getFullYear();
                 const month = String(d.getMonth() + 1).padStart(2, '0');
                 const day = String(d.getDate()).padStart(2, '0');
-                setDate(`${year}-${month}-${day}`);
+                const formattedDate = `${year}-${month}-${day}`;
+                setDate(formattedDate);
+                setImportDate(formattedDate);
              } catch (e) { console.error("Invalid date", e); }
           } else {
              // Default date to today if none specified
@@ -228,12 +270,15 @@ const TeacherInputGrades: React.FC = () => {
              const year = today.getFullYear();
              const month = String(today.getMonth() + 1).padStart(2, '0');
              const day = String(today.getDate()).padStart(2, '0');
-             setDate(`${year}-${month}-${day}`);
+             const formattedDate = `${year}-${month}-${day}`;
+             setDate(formattedDate);
+             setImportDate(formattedDate);
           }
 
           // 3. Set Keterangan (Dari Judul Tugas)
           if (p.task_name) {
               setDesc(p.task_name);
+              setImportDesc(p.task_name);
           }
       }
   }, [location.state]);
@@ -404,10 +449,15 @@ const TeacherInputGrades: React.FC = () => {
     // Determine the prefilled values based on selected Import card details
     let prefilledJenisTugas = '';
     let prefilledKetMateri = '';
+    let prefilledTp = '-';
 
     if (importType) {
       prefilledJenisTugas = importType;
       if (importType === 'Harian' || importType === 'Praktik') {
+        const foundTp = importTps.find(t => t.id === importTpId);
+        if (foundTp) {
+          prefilledTp = `${foundTp.code}: ${foundTp.name}`;
+        }
         const foundAsm = importAssessments.find(a => a.id === importAssessmentId);
         if (foundAsm) {
           prefilledKetMateri = foundAsm.name;
@@ -423,6 +473,7 @@ const TeacherInputGrades: React.FC = () => {
       'NAMA SISWA': s.namalengkap,
       'KELAS': importKelas, 
       'SEMESTER': importSemester || '', 
+      'TUJUAN PEMBELAJARAN': prefilledTp,
       'JENIS TUGAS': prefilledJenisTugas,  
       'KET/MATERI': prefilledKetMateri, 
       'NILAI': ''
@@ -563,14 +614,37 @@ const TeacherInputGrades: React.FC = () => {
               if (allAsms && allTps && rowKelasGrade && rowSem) {
                   try {
                       const filteredTps = allTps.filter((t: any) => String(t.grade) === String(rowKelasGrade) && String(t.semester) === String(rowSem));
-                      const tpIds = filteredTps.map((t: any) => t.id);
-                      const filteredAsms = allAsms.filter((a: any) => tpIds.includes(a.tpId));
+                      const rowTp = String(row['TUJUAN PEMBELAJARAN'] || row['tujuan pembelajaran'] || '').trim();
+                      
+                      let matchedTp: any = null;
+                      if (rowTp) {
+                          matchedTp = filteredTps.find((t: any) => 
+                              String(t.id).toLowerCase().trim() === rowTp.toLowerCase() ||
+                              String(t.code).toLowerCase().trim() === rowTp.toLowerCase() ||
+                              rowTp.toLowerCase().includes(String(t.code).toLowerCase().trim()) ||
+                              rowTp.toLowerCase().includes(String(t.name).toLowerCase().trim())
+                          );
+                      }
 
-                      const matchedAsm = filteredAsms.find((a: any) => 
-                          String(a.id).toLowerCase().trim() === String(rowKet).toLowerCase().trim() ||
-                          String(a.name).toLowerCase().trim() === String(rowKet).toLowerCase().trim() ||
-                          String(a.name).replace(/\([^\)]+\)/g, '').toLowerCase().trim() === String(rowKet).toLowerCase().trim()
-                      );
+                      let matchedAsm: any = null;
+                      if (matchedTp) {
+                          const asmsForTp = allAsms.filter((a: any) => a.tpId === matchedTp.id);
+                          matchedAsm = asmsForTp.find((a: any) => 
+                              String(a.id).toLowerCase().trim() === String(rowKet).toLowerCase().trim() ||
+                              String(a.name).toLowerCase().trim() === String(rowKet).toLowerCase().trim() ||
+                              String(a.name).replace(/\([^\)]+\)/g, '').toLowerCase().trim() === String(rowKet).toLowerCase().trim()
+                          );
+                      }
+
+                      if (!matchedAsm) {
+                          const tpIds = filteredTps.map((t: any) => t.id);
+                          const filteredAsms = allAsms.filter((a: any) => tpIds.includes(a.tpId));
+                          matchedAsm = filteredAsms.find((a: any) => 
+                              String(a.id).toLowerCase().trim() === String(rowKet).toLowerCase().trim() ||
+                              String(a.name).toLowerCase().trim() === String(rowKet).toLowerCase().trim() ||
+                              String(a.name).replace(/\([^\)]+\)/g, '').toLowerCase().trim() === String(rowKet).toLowerCase().trim()
+                          );
+                      }
 
                       if (matchedAsm) {
                           finalDescription = matchedAsm.id;
@@ -877,7 +951,7 @@ const TeacherInputGrades: React.FC = () => {
              </div>
 
              {/* ROW 3: MAP JENIS TUGAS IMPORT & ASSESSMENT SELECTORS */}
-             <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50/55 rounded-2xl border border-slate-100">
+             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-3 bg-slate-50/55 rounded-2xl border border-slate-100">
                  <div className="space-y-1">
                     <label className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Jenis Tugas Import</label>
                     <select 
@@ -895,21 +969,36 @@ const TeacherInputGrades: React.FC = () => {
 
                  {/* Dynamic inputs for Import based on type chosen */}
                  {(importType === 'Harian' || importType === 'Praktik') ? (
-                    <div className="space-y-1">
-                       <label className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penilaian / Tugas</label>
-                       <select 
-                         className="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-[9px] md:text-xs font-black outline-none text-slate-800 focus:border-blue-500 truncate"
-                         value={importAssessmentId}
-                         onChange={(e) => setImportAssessmentId(e.target.value)}
-                       >
-                         <option value="">-- Pilih Penilaian --</option>
-                         {importAssessments.map(asm => (
-                           <option key={asm.id} value={asm.id}>{asm.name} ({asm.type})</option>
-                         ))}
-                       </select>
-                    </div>
+                    <>
+                       <div className="space-y-1">
+                          <label className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih TP</label>
+                          <select 
+                            className="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-[9px] md:text-xs font-black outline-none text-slate-800 focus:border-blue-500 truncate"
+                            value={importTpId}
+                            onChange={(e) => setImportTpId(e.target.value)}
+                          >
+                            <option value="">-- Pilih TP --</option>
+                            {importTps.map(tp => (
+                              <option key={tp.id} value={tp.id}>{tp.code}: {tp.name}</option>
+                            ))}
+                          </select>
+                       </div>
+                       <div className="space-y-1">
+                          <label className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penilaian / Tugas</label>
+                          <select 
+                            className="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-[9px] md:text-xs font-black outline-none text-slate-800 focus:border-blue-500 truncate"
+                            value={importAssessmentId}
+                            onChange={(e) => setImportAssessmentId(e.target.value)}
+                          >
+                            <option value="">-- Pilih Penilaian --</option>
+                            {importAssessments.map(asm => (
+                              <option key={asm.id} value={asm.id}>{asm.name} ({asm.type})</option>
+                            ))}
+                          </select>
+                       </div>
+                    </>
                  ) : (importType !== '') ? (
-                    <div className="space-y-1">
+                    <div className="space-y-1 sm:col-span-1 md:col-span-2">
                        <label className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Keterangan / Materi</label>
                        <input 
                          type="text"
@@ -920,7 +1009,7 @@ const TeacherInputGrades: React.FC = () => {
                        />
                     </div>
                  ) : (
-                    <div className="space-y-1 opacity-50">
+                    <div className="space-y-1 sm:col-span-1 md:col-span-2 opacity-50">
                        <label className="text-[8px] md:text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">Penilaian / Tugas</label>
                        <div className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-100 text-[9px] md:text-xs font-black text-slate-400">Pilih Jenis Tugas dulu</div>
                     </div>

@@ -73,6 +73,7 @@ const setupWorksheet = (sheet: any, data: any[], meta?: ExcelMeta) => {
             // REVISI: NIS Dikecilkan jadi 10 (sebelumnya 15)
             else if (key === 'NIS') width = 10;
             else if (key === 'NAMA SISWA' || key === 'NAMA LENGKAP') width = 35;
+            else if (key === 'TUJUAN PEMBELAJARAN') width = 45;
             else if (key === 'JUMLAH KUNJUNGAN') width = 20;
             else if (key === 'HALAMAN TERAKHIR') width = 25;
             else if (key === 'AKTIVITAS TERAKHIR') width = 25;
