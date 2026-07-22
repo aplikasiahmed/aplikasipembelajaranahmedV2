@@ -207,9 +207,9 @@ const PublicMaterials: React.FC = () => {
             <BookOpen className="absolute inset-0 m-auto text-emerald-600 animate-pulse" size={24} />
           </div>
           <div className="space-y-1.5">
-            <h3 className="text-base font-black text-slate-800 uppercase tracking-wide">Materi Pembelajaran</h3>
-            <p className="text-xs sm:text-sm font-semibold text-slate-500 max-w-md mx-auto">
-              materi pembalajaran dalam pengembangan guru
+            <h3 className="text-base font-black text-slate-800 uppercase tracking-wide">Materi dalam pengembangan</h3>
+            <p className="text-xs sm:text-sm font-semibold text-slate-400 max-w-md mx-auto">
+              Materi pembelajaran Pendidikan Agama Islam sedang dipersiapkan oleh guru. Silakan periksa kembali nanti.
             </p>
           </div>
         </div>
@@ -416,7 +416,7 @@ const PublicMaterials: React.FC = () => {
         const isCompleted = completedReadIds.includes(selectedMaterial.id);
 
         return (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 md:p-6 overflow-y-auto animate-fadeIn">
+          <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 md:p-6 overflow-y-auto animate-fadeIn">
             <div className="bg-white w-full h-full sm:h-auto sm:max-h-[92vh] sm:max-w-4xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-100 animate-slideUp">
               
               {/* Modal Header Bar */}
@@ -591,7 +591,7 @@ const PublicMaterials: React.FC = () => {
               </div>
 
               {/* Modal Footer Controls */}
-              <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="px-5 pt-4 pb-7 sm:pb-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
                 <span className="text-[10px] text-slate-400 font-bold italic text-center sm:text-left">
                   {isCompleted 
                     ? '✓ Materi ini sudah kamu tandai selesai dibaca.' 
