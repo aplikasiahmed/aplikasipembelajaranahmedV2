@@ -17,7 +17,8 @@ import {
   Scale,
   Target,
   Activity,
-  BookOpen
+  BookOpen,
+  ClipboardList
 } from 'lucide-react';
 import { db } from '../services/supabaseMock';
 
@@ -53,6 +54,7 @@ const TeacherDashboard: React.FC = () => {
     { title: 'Bobot Penilaian', path: '/guru/bobotnilai', icon: Scale, color: 'bg-emerald-700', text: 'text-emerald-700', bg: 'bg-emerald-50 border border-emerald-100/50', desc: 'Atur Kontribusi Persentase Nilai' },
     { title: 'Materi Pembelajaran', path: '/guru/materi', icon: BookOpen, color: 'bg-emerald-600', text: 'text-emerald-600', bg: 'bg-emerald-50 border border-emerald-100', desc: 'Kelola gambar, modul & teks materi' },
     { title: 'Data Siswa', path: '/guru/datasiswa', icon: Users, color: 'bg-blue-600', text: 'text-blue-600', bg: 'bg-blue-50/80 border border-blue-100', desc: 'Kelola & Import data siswa' },
+    { title: 'Jurnal Harian', path: '/guru/jurnal', icon: ClipboardList, color: 'bg-emerald-600', text: 'text-emerald-600', bg: 'bg-emerald-50 border border-emerald-100', desc: 'Catat aktivitas mengajar harian guru' },
     { title: 'Input Nilai', path: '/guru/nilai', icon: Award, color: 'bg-emerald-600', text: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Kelola nilai harian & ujian' },
     { title: 'Input Absensi', path: '/guru/absensi', icon: ClipboardCheck, color: 'bg-amber-600', text: 'text-amber-600', bg: 'bg-amber-50', desc: 'Rekap kehadiran harian' },
     { title: 'Cek Tugas', path: '/guru/tugas-masuk', icon: FileText, color: 'bg-purple-600', text: 'text-purple-600', bg: 'bg-purple-50', desc: 'Koreksi tugas & ujian' },
@@ -88,7 +90,7 @@ const TeacherDashboard: React.FC = () => {
       </div>
 
       {/* STATS GRID - 2 Kolom di Mobile untuk Efisiensi & Estetika */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard 
             icon={Users} 
             color="emerald" 
@@ -108,46 +110,46 @@ const TeacherDashboard: React.FC = () => {
             value={stats.onlineExamsCount} 
         />
         {/* Status Absensi dengan indikator visual */}
-        <div className="bg-white p-4 md:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-between h-full relative overflow-hidden group hover:border-amber-200 transition-all">
-            <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:scale-110 transition-transform"><ClipboardCheck size={80}/></div>
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mb-2 shadow-sm">
-                <ClipboardCheck size={20} className="md:w-6 md:h-6" />
+        <div className="bg-white p-3.5 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-full relative overflow-hidden group hover:border-amber-200 transition-all">
+            <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:scale-110 transition-transform"><ClipboardCheck size={60}/></div>
+            <div className="w-9 h-9 md:w-10 md:h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mb-2 shadow-sm">
+                <ClipboardCheck size={18} className="md:w-5 md:h-5" />
             </div>
             <div>
-                <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Status Absensi</p>
+                <p className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Status Absensi</p>
                 <div className="flex items-center gap-1.5">
                     <span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>
-                    <p className="font-black text-slate-800 text-sm md:text-lg">Terisi</p>
+                    <p className="font-black text-slate-800 text-xs md:text-sm">Terisi</p>
                 </div>
             </div>
         </div>
       </div>
 
-      {/* MENU GRID - 2 Kolom di Mobile */}
+      {/* MENU GRID - Responsive grid columns for professional density */}
       <div>
-        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-3 ml-1">Menu Kelola</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
+        <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-3 ml-1">Menu Kelola</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 gap-2.5 md:gap-3">
             {menuItems.map((item, idx) => (
             <button
                 key={idx}
                 onClick={() => navigate(item.path)}
-                className="bg-white p-4 md:p-6 rounded-[1.8rem] md:rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-100 transition-all group text-left relative overflow-hidden active:scale-95 flex flex-col justify-between h-full min-h-[140px] md:min-h-[160px]"
+                className="bg-white p-2.5 md:p-3.5 rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all duration-300 ease-out hover:scale-[1.02] active:scale-[0.98] group text-left relative overflow-hidden flex flex-col justify-between h-full min-h-[105px] sm:min-h-[110px] md:min-h-[115px]"
             >
-                <div className="absolute top-0 right-0 p-4 md:p-6 opacity-[0.03] group-hover:opacity-10 transition-opacity">
-                    <item.icon className="w-[60px] h-[60px] md:w-[80px] md:h-[80px]" />
+                <div className="absolute top-0 right-0 p-2 md:p-3 opacity-[0.02] group-hover:opacity-[0.06] transition-opacity">
+                    <item.icon className="w-[35px] h-[35px] md:w-[45px] md:h-[45px]" />
                 </div>
 
                 <div>
-                    <div className={`w-10 h-10 md:w-14 md:h-14 ${item.bg} ${item.text} rounded-2xl flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform`}>
-                        <item.icon size={20} className="md:w-7 md:h-7" />
+                    <div className={`w-7 h-7 md:w-8.5 md:h-8.5 ${item.bg} ${item.text} rounded-lg flex items-center justify-center mb-2 shadow-sm group-hover:scale-105 transition-transform`}>
+                        <item.icon size={14} className="md:w-4 md:h-4" />
                     </div>
-                    <h3 className="font-bold text-slate-800 text-xs md:text-lg leading-tight mb-1 group-hover:text-emerald-700 transition-colors">{item.title}</h3>
-                    <p className="text-slate-400 text-[9px] md:text-xs font-medium leading-relaxed line-clamp-2 pr-2">{item.desc}</p>
+                    <h3 className="font-extrabold text-slate-800 text-[10px] sm:text-[10.5px] md:text-[11.5px] leading-tight mb-0.5 group-hover:text-emerald-700 transition-colors uppercase tracking-tight">{item.title}</h3>
+                    <p className="text-slate-400 text-[8.5px] sm:text-[9px] md:text-[9.5px] font-medium leading-relaxed line-clamp-2 pr-1">{item.desc}</p>
                 </div>
                 
-                <div className="mt-3 flex justify-end">
-                    <div className="bg-slate-50 p-1.5 md:p-2 rounded-xl text-slate-300 group-hover:text-emerald-600 group-hover:bg-emerald-50 transition-colors">
-                        <ArrowRight size={14} className="md:w-5 md:h-5" />
+                <div className="mt-2 flex justify-end">
+                    <div className="bg-slate-50 p-1 md:p-1 rounded-lg text-slate-300 group-hover:text-emerald-600 group-hover:bg-emerald-50 transition-colors">
+                        <ArrowRight size={10} className="md:w-3.5 md:h-3.5" />
                     </div>
                 </div>
             </button>
@@ -169,14 +171,14 @@ const StatCard = ({ icon: Icon, color, label, value }: any) => {
     const s = styles[color] || styles.emerald;
 
     return (
-        <div className={`bg-white p-4 md:p-5 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-between h-full relative overflow-hidden group transition-all ${s.border}`}>
-            <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:scale-110 transition-transform"><Icon size={80}/></div>
-            <div className={`w-10 h-10 md:w-12 md:h-12 ${s.bg} ${s.text} rounded-2xl flex items-center justify-center mb-2 shadow-sm`}>
-                <Icon size={20} className="md:w-6 md:h-6" />
+        <div className={`bg-white p-3.5 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-full relative overflow-hidden group transition-all ${s.border}`}>
+            <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:scale-110 transition-transform"><Icon size={60}/></div>
+            <div className={`w-9 h-9 md:w-10 md:h-10 ${s.bg} ${s.text} rounded-xl flex items-center justify-center mb-2 shadow-sm`}>
+                <Icon size={18} className="md:w-5 md:h-5" />
             </div>
             <div>
-                <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
-                <p className="font-black text-slate-800 text-xl md:text-3xl leading-none">{value}</p>
+                <p className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
+                <p className="font-black text-slate-800 text-lg md:text-xl leading-none">{value}</p>
             </div>
         </div>
     );

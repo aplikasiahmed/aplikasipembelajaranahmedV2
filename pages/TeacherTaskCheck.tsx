@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, ExternalLink, Image as ImageIcon, Link as LinkIcon, Trash2, Loader2, Calendar, FileText, ArrowLeft, CheckCircle2, Clock, ShieldAlert } from 'lucide-react';
+import { Search, Filter, ExternalLink, Image as ImageIcon, Link as LinkIcon, Trash2, Loader2, Calendar, FileText, ArrowLeft, CheckCircle2, Clock, ShieldAlert, RefreshCw } from 'lucide-react';
 import { db } from '../services/supabaseMock';
 import { TaskSubmission, GradeLevel } from '../types';
 import Swal from 'sweetalert2';
@@ -15,6 +15,33 @@ const TeacherTaskCheck: React.FC = () => {
   
   const [tasks, setTasks] = useState<TaskSubmission[]>([]);
   const [examResults, setExamResults] = useState<any[]>([]);
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncData = async () => {
+    setSyncing(true);
+    try {
+      await db.syncFromGoogleSheets();
+      await loadClasses();
+      if (activeTab === 'tasks') {
+        await loadTasks();
+      } else {
+        await loadExamResults();
+      }
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Data berhasil disinkronkan!',
+        showConfirmButton: false,
+        timer: 1500
+      });
+    } catch (error) {
+      console.error(error);
+      Swal.fire('Gagal', 'Gagal menyinkronkan data dari Google Sheets.', 'error');
+    } finally {
+      setSyncing(false);
+    }
+  };
   
   // --- STATE FILTER ---
   const [filterGrade, setFilterGrade] = useState<GradeLevel | 'all'>('all');
@@ -90,21 +117,55 @@ const TeacherTaskCheck: React.FC = () => {
           day: 'numeric', month: 'long', year: 'numeric'
       });
 
+      let displayUrl = task.content;
+      if (displayUrl && !displayUrl.startsWith('data:') && !displayUrl.startsWith('http')) {
+        displayUrl = `data:image/jpeg;base64,${displayUrl}`;
+      }
+
+      // Cek apakah nilai sudah diinput
+      let alreadyGraded = false;
+      try {
+        const students = await db.getStudentsByKelas(task.kelas);
+        const targetStudent = students.find(s => s.namalengkap.toLowerCase().trim() === task.student_name.toLowerCase().trim());
+        if (targetStudent) {
+          const grades = db.getLocalTable<any>('Nilai');
+          alreadyGraded = grades.some(g => 
+            g.student_id === targetStudent.id &&
+            g.kelas === task.kelas &&
+            g.description?.toLowerCase().trim() === task.task_name?.toLowerCase().trim()
+          );
+        }
+      } catch (e) {
+        console.error("Gagal memeriksa status nilai:", e);
+      }
+
       const result = await Swal.fire({
         title: `Tugas: ${task.task_name}`,
         text: `Dari: ${task.student_name} (${task.kelas}) • Tanggal: ${dateStr}`,
-        imageUrl: task.content,
+        imageUrl: displayUrl,
         imageAlt: 'Tugas Siswa',
         showCancelButton: true,
-        confirmButtonText: 'INPUT NILAI',
+        confirmButtonText: alreadyGraded ? 'NILAI SUDAH DIINPUT' : 'INPUT NILAI',
         cancelButtonText: 'TUTUP',
-        confirmButtonColor: '#059669',
+        confirmButtonColor: alreadyGraded ? '#64748b' : '#059669', // Abu-abu jika sudah dinilai, hijau jika belum
         cancelButtonColor: '#dc2626',
         reverseButtons: true,
-        customClass: { popup: 'rounded-3xl' }
+        customClass: { popup: 'rounded-3xl' },
+        heightAuto: false
       });
 
       if (result.isConfirmed) {
+         if (alreadyGraded) {
+           Swal.fire({
+             icon: 'info',
+             title: 'Sudah Dinilai',
+             text: 'Tugas ini sudah memiliki nilai di database agar guru tidak menginput ganda.',
+             confirmButtonColor: '#64748b',
+             heightAuto: false
+           });
+           return;
+         }
+
          navigate('/guru/nilai', {
              state: {
                  prefill: {
@@ -267,25 +328,47 @@ const TeacherTaskCheck: React.FC = () => {
       </button>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg md:text-2xl font-black text-slate-800 tracking-tight leading-tight">Monitoring Siswa</h1>
-          <p className="text-slate-400 text-[10px] md:text-sm font-medium">Cek pengumpulan tugas harian dan hasil tugas online.</p>
+        <div className="flex items-center justify-between w-full md:w-auto">
+          <div>
+            <h1 className="text-lg md:text-2xl font-black text-slate-800 tracking-tight leading-tight">Monitoring Siswa</h1>
+            <p className="text-slate-400 text-[10px] md:text-sm font-medium">Cek pengumpulan tugas harian dan hasil tugas online.</p>
+          </div>
+          
+          <button
+            onClick={handleSyncData}
+            disabled={syncing}
+            className={`md:hidden flex items-center justify-center p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 hover:bg-purple-100 transition-all ${syncing ? 'animate-spin' : ''}`}
+            title="Sinkronisasi Google Sheets"
+          >
+            <RefreshCw size={16} />
+          </button>
         </div>
         
-        {/* TABS SWITCHER */}
-        <div className="bg-slate-100 p-1 rounded-xl flex">
-            <button 
-                onClick={() => setActiveTab('tasks')}
-                className={`flex-1 px-4 py-2 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${activeTab === 'tasks' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-                <FileText size={14} /> Tugas Upload
-            </button>
-            <button 
-                onClick={() => setActiveTab('exams')}
-                className={`flex-1 px-4 py-2 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${activeTab === 'exams' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-                <CheckCircle2 size={14} /> Tugas Online
-            </button>
+        <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2">
+          <button
+            onClick={handleSyncData}
+            disabled={syncing}
+            className={`hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 hover:bg-purple-100 font-bold text-xs transition-all ${syncing ? 'opacity-80 cursor-not-allowed' : ''}`}
+          >
+            <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+            <span>{syncing ? 'Sinkronisasi...' : 'Tarik Data Terbaru'}</span>
+          </button>
+          
+          {/* TABS SWITCHER */}
+          <div className="bg-slate-100 p-1 rounded-xl flex">
+              <button 
+                  onClick={() => setActiveTab('tasks')}
+                  className={`flex-1 px-4 py-2 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${activeTab === 'tasks' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                  <FileText size={14} /> Tugas Upload
+              </button>
+              <button 
+                  onClick={() => setActiveTab('exams')}
+                  className={`flex-1 px-4 py-2 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${activeTab === 'exams' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                  <CheckCircle2 size={14} /> Tugas Online
+              </button>
+          </div>
         </div>
       </div>
       

@@ -1,4 +1,4 @@
-import { Student, AttendanceRecord, GradeRecord, Material, GradeLevel, TaskSubmission, AdminUser, Exam, Question, ExamResult } from '../types';
+import { Student, AttendanceRecord, GradeRecord, Material, GradeLevel, TaskSubmission, AdminUser, Exam, Question, ExamResult, JurnalHarian } from '../types';
 import { firestore } from './firebase';
 import { collection, doc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 
@@ -21,7 +21,8 @@ const TABS_CONFIG: SheetConfig[] = [
   { name: 'nilai_rapot', headers: ['id', 'student_id', 'nama_siswa', 'nis', 'kelas', 'semester', 'sts', 'sas', 'sakit', 'izin', 'alpha', 'sikap', 'katrol', 'nilai_akhir', 'updated_at'] },
   { name: 'tujuan_pembelajaran', headers: ['id', 'code', 'name', 'description', 'subject', 'grade', 'semester'] },
   { name: 'asesmen_tp', headers: ['id', 'tpId', 'name', 'type'] },
-  { name: 'kunjungan', headers: ['id', 'nis', 'nama', 'kelas', 'halaman', 'timestamp', 'device', 'browser', 'duration'] }
+  { name: 'kunjungan', headers: ['id', 'nis', 'nama', 'kelas', 'halaman', 'timestamp', 'device', 'browser', 'duration'] },
+  { name: 'JurnalHarian', headers: ['id', 'tanggal', 'kelas', 'jam_mengajar', 'deskripsi', 'created_at'] }
 ];
 
 class DatabaseService {
@@ -1716,6 +1717,27 @@ class DatabaseService {
       list.splice(targetIdx, 1);
       this.setLocalTable('hasil_ujian', list);
     }
+  }
+
+  async getJurnalHarian(): Promise<JurnalHarian[]> {
+    return this.getLocalTable<JurnalHarian>('JurnalHarian') || [];
+  }
+
+  async addJurnalHarian(journal: Omit<JurnalHarian, 'id' | 'created_at'>): Promise<JurnalHarian> {
+    const list = this.getLocalTable<JurnalHarian>('JurnalHarian') || [];
+    const newEntry: JurnalHarian = {
+      ...journal,
+      id: 'jr_' + Math.random().toString(36).substr(2, 9),
+      created_at: new Date().toISOString()
+    };
+    list.push(newEntry);
+    this.setLocalTable('JurnalHarian', list);
+
+    this.syncToGoogleSheets('JurnalHarian').catch(err => {
+      console.warn("Gagal sinkronisasi JurnalHarian ke Google Sheets:", err);
+    });
+
+    return newEntry;
   }
 }
 

@@ -24,6 +24,7 @@ import TeacherWeightSettings from './pages/TeacherWeightSettings';
 import TeacherStudents from './pages/TeacherStudents';
 import TeacherVisits from './pages/TeacherVisits';
 import TeacherMaterials from './pages/TeacherMaterials';
+import TeacherJournal from './pages/TeacherJournal';
 import { db } from './services/supabaseMock';
 
 // Higher Order Component for Route Protection
@@ -144,6 +145,11 @@ const App: React.FC = () => {
           <Route path="/guru/datasiswa" element={
             <ProtectedRoute>
               <TeacherStudents />
+            </ProtectedRoute>
+          } />
+          <Route path="/guru/jurnal" element={
+            <ProtectedRoute>
+              <TeacherJournal />
             </ProtectedRoute>
           } />
           <Route path="/guru/materi" element={

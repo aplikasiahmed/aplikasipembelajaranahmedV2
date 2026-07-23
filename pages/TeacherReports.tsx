@@ -61,6 +61,158 @@ const TeacherReports: React.FC = () => {
   const [appsScriptUrl, setAppsScriptUrl] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
+  // --- STATES FOR MONTHLY SUMMARY ---
+  const [sumKelas, setSumKelas] = useState('');
+  const [sumSemester, setSumSemester] = useState('');
+  const [sumMonth, setSumMonth] = useState('');
+  const [sumYear, setSumYear] = useState(new Date().getFullYear().toString());
+  const [sumData, setSumData] = useState<any | null>(null);
+  const [generatingSum, setGeneratingSum] = useState(false);
+
+  const handleGenerateMonthlySummary = async () => {
+    if (!sumKelas || !sumMonth || !sumSemester) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Perhatian',
+        text: 'Pilih Kelas, Semester, dan Bulan terlebih dahulu!',
+        heightAuto: false
+      });
+      return;
+    }
+
+    setGeneratingSum(true);
+    Swal.fire({
+      title: 'Memproses...',
+      text: 'Sedang menyusun ringkasan bulanan (absensi, nilai, dan jurnal)...',
+      didOpen: () => Swal.showLoading(),
+      allowOutsideClick: false,
+      heightAuto: false
+    });
+
+    try {
+      // 1. Fetch students in selected class
+      const students = await db.getStudentsByKelas(sumKelas);
+      if (!students || students.length === 0) {
+        Swal.close();
+        Swal.fire({
+          icon: 'info',
+          title: 'Kosong',
+          text: `Tidak ditemukan data siswa untuk Kelas ${sumKelas}.`,
+          heightAuto: false
+        });
+        setGeneratingSum(false);
+        return;
+      }
+
+      // Sort students A-Z
+      const sortedStudents = [...students].sort((a, b) => a.namalengkap.localeCompare(b.namalengkap));
+
+      // 2. Fetch attendance records
+      let attendanceList = await db.getAttendanceByKelas(sumKelas, sumSemester, undefined, sumYear);
+      if (sumMonth) {
+        const mTarget = parseInt(sumMonth);
+        attendanceList = attendanceList.filter(a => {
+          const d = new Date(a.date);
+          return (d.getMonth() + 1) === mTarget;
+        });
+      }
+
+      // 3. Fetch calculated grades
+      const pivotedData = await getDynamicGradeReportData(sumKelas, sumSemester);
+      const gradesMap: Record<string, any> = {};
+      if (pivotedData && pivotedData.length > 0) {
+        pivotedData.forEach(row => {
+          const nis = row['NIS'];
+          gradesMap[nis] = row['NILAI AKHIR'];
+        });
+      }
+
+      // 4. Fetch teacher journals
+      const allJournals = await db.getJurnalHarian();
+      const classJournals = allJournals.filter(j => {
+        if (j.kelas !== sumKelas) return false;
+        const d = new Date(j.tanggal);
+        return (d.getMonth() + 1) === parseInt(sumMonth) && d.getFullYear() === parseInt(sumYear);
+      }).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+
+      // 5. Aggregate student records
+      const compiledStudents = sortedStudents.map((s, idx) => {
+        const sAttendance = attendanceList.filter(a => a.student_id === s.id);
+        const hadir = sAttendance.filter(r => r.status?.toLowerCase() === 'hadir').length;
+        const sakit = sAttendance.filter(r => r.status?.toLowerCase() === 'sakit').length;
+        const izin = sAttendance.filter(r => r.status?.toLowerCase() === 'izin').length;
+        const alfa = sAttendance.filter(r => r.status?.toLowerCase() === 'alfa').length;
+        const totalHari = hadir + sakit + izin + alfa;
+        const persentaseKehadiran = totalHari > 0 ? Math.round((hadir / totalHari) * 100) : 100;
+
+        return {
+          no: idx + 1,
+          nis: s.nis,
+          nama: s.namalengkap,
+          hadir,
+          sakit,
+          izin,
+          alfa,
+          persentaseKehadiran,
+          nilaiAkhir: gradesMap[s.nis] !== undefined ? gradesMap[s.nis] : '-'
+        };
+      });
+
+      // 6. Calculate statistics
+      const totalSiswa = compiledStudents.length;
+      const validScores = compiledStudents.map(s => Number(s.nilaiAkhir)).filter(val => !isNaN(val));
+      const rataRataNilai = validScores.length > 0 
+        ? parseFloat((validScores.reduce((a, b) => a + b, 0) / validScores.length).toFixed(1))
+        : 0;
+      
+      const totalJamMengajar = classJournals.reduce((sum, j) => sum + Number(j.jam_mengajar || 0), 0);
+      const rataRataHadir = compiledStudents.length > 0
+        ? Math.round(compiledStudents.reduce((sum, s) => sum + s.persentaseKehadiran, 0) / compiledStudents.length)
+        : 100;
+
+      setSumData({
+        kelas: sumKelas,
+        semester: sumSemester === '1' ? '1 (Ganjil)' : '2 (Genap)',
+        bulan: formatBulan(sumMonth),
+        tahun: sumYear,
+        students: compiledStudents,
+        journals: classJournals,
+        stats: {
+          totalSiswa,
+          rataRataNilai,
+          totalJamMengajar,
+          rataRataHadir
+        }
+      });
+
+      Swal.close();
+      setTimeout(() => {
+        Swal.fire({
+          icon: 'success',
+          title: 'Berhasil',
+          text: `Data ringkasan untuk Kelas ${sumKelas} bulan ${formatBulan(sumMonth)} berhasil disusun!`,
+          timer: 1500,
+          showConfirmButton: false,
+          heightAuto: false
+        });
+      }, 150);
+
+    } catch (e) {
+      console.error("Gagal menyusun ringkasan bulanan:", e);
+      Swal.close();
+      setTimeout(() => {
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: 'Terjadi kesalahan sistem saat menyusun ringkasan bulanan.',
+          heightAuto: false
+        });
+      }, 150);
+    } finally {
+      setGeneratingSum(false);
+    }
+  };
+
   // KKM Analysis State variables
   const [kkmKelas, setKkmKelas] = useState('');
   const [kkmSemester, setKkmSemester] = useState('');
@@ -242,6 +394,20 @@ const TeacherReports: React.FC = () => {
       setSemAbsen('2');
     }
   }, [monthAbsen]);
+
+  // Auto-set Semester Ringkasan Bulanan berdasarkan Bulan
+  useEffect(() => {
+    if (!sumMonth) {
+      setSumSemester('');
+      return;
+    }
+    const m = parseInt(sumMonth);
+    if (m >= 7 && m <= 12) {
+      setSumSemester('1');
+    } else {
+      setSumSemester('2');
+    }
+  }, [sumMonth]);
 
   const fetchAllKelas = async () => {
     try {
@@ -914,6 +1080,7 @@ const TeacherReports: React.FC = () => {
   };
 
   return (
+    <>
     <div className="max-w-4xl mx-auto space-y-3 md:space-y-6 animate-fadeIn pb-24 px-1 no-print">
       {/* Header Responsif */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white/50 backdrop-blur-sm p-3 md:p-0 rounded-2xl md:bg-transparent">
@@ -1098,6 +1265,180 @@ const TeacherReports: React.FC = () => {
       </div>
 
       {/* ==============================================
+          KARTU BARU: RINGKASAN BULANAN OTOMATIS (PDF)
+          ============================================== */}
+      <div className="bg-white p-4 md:p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-5">
+        <div className="flex items-center gap-3 border-b border-slate-50 pb-3">
+          <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+            <FileText size={18} />
+          </div>
+          <div>
+            <h2 className="text-[11px] md:text-sm font-black uppercase tracking-widest text-slate-800">Ringkasan Bulanan Otomatis (PDF)</h2>
+            <p className="text-[9px] text-slate-400 font-medium">Gabungkan rekap absensi harian, nilai akhir, dan jurnal mengajar guru dalam satu laporan PDF resmi.</p>
+          </div>
+        </div>
+
+        {/* CONTROLS */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+          <div className="space-y-1">
+            <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Kelas</label>
+            <select 
+              className="w-full p-2 text-[10px] md:text-xs border border-slate-200 rounded-xl font-normal outline-none bg-white text-slate-900"
+              value={sumKelas} 
+              onChange={(e) => setSumKelas(e.target.value)}
+            >
+              <option value="">-- Pilih Kelas --</option>
+              {availKelas.map(k => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Pilih Bulan</label>
+            <select 
+              className="w-full p-2 text-[10px] md:text-xs border border-slate-200 rounded-xl font-normal outline-none bg-white text-slate-900"
+              value={sumMonth} 
+              onChange={(e) => setSumMonth(e.target.value)}
+            >
+              <option value="">-- Pilih Bulan --</option>
+              {['01','02','03','04','05','06','07','08','09','10','11','12'].map(m => (
+                <option key={m} value={m}>{formatBulan(m)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Semester</label>
+            <select 
+              className="w-full p-2 text-[10px] md:text-xs border border-slate-200 rounded-xl font-normal outline-none bg-white text-slate-900"
+              value={sumSemester} 
+              onChange={(e) => setSumSemester(e.target.value)}
+            >
+              <option value="">-- Pilih Semester --</option>
+              <option value="1">1 (Ganjil)</option>
+              <option value="2">2 (Genap)</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button 
+            onClick={handleGenerateMonthlySummary}
+            disabled={generatingSum}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {generatingSum ? (
+              <><RefreshCw size={14} className="animate-spin" /> Menyusun...</>
+            ) : (
+              <><RefreshCw size={14} /> Susun Ringkasan</>
+            )}
+          </button>
+        </div>
+
+        {/* INTERACTIVE PREVIEW PANEL */}
+        {sumData && (
+          <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/30 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/60 pb-3">
+              <div>
+                <span className="bg-blue-100 text-blue-800 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">PREVIEW LAPORAN</span>
+                <h3 className="text-xs md:text-sm font-black text-slate-800 uppercase mt-1">Ringkasan {sumData.bulan} {sumData.tahun} - Kelas {sumData.kelas}</h3>
+              </div>
+              <button 
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+              >
+                <Download size={12} /> Unduh / Cetak Laporan PDF
+              </button>
+            </div>
+
+            {/* QUICK STATS */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Total Siswa</p>
+                <p className="text-sm font-black text-slate-800">{sumData.stats.totalSiswa} Siswa</p>
+              </div>
+              <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Rata Nilai Akhir</p>
+                <p className="text-sm font-black text-slate-800">{sumData.stats.rataRataNilai}</p>
+              </div>
+              <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Rata Kehadiran</p>
+                <p className="text-sm font-black text-slate-800">{sumData.stats.rataRataHadir}%</p>
+              </div>
+              <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Durasi Mengajar</p>
+                <p className="text-sm font-black text-slate-800">{sumData.stats.totalJamMengajar} Jam</p>
+              </div>
+            </div>
+
+            {/* TABEL PREVIEW SISWA & JURNAL */}
+            <div className="space-y-3">
+              <div>
+                <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1">Riwayat Jurnal Bulan Ini ({sumData.journals.length} Catatan)</h4>
+                <div className="max-h-[160px] overflow-y-auto border border-slate-100 rounded-xl bg-white text-[10px]">
+                  {sumData.journals.length === 0 ? (
+                    <p className="p-4 text-center text-slate-400 italic font-medium">Belum ada catatan jurnal guru.</p>
+                  ) : (
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold">
+                          <th className="p-2 w-20">Tanggal</th>
+                          <th className="p-2 w-16">Jam</th>
+                          <th className="p-2">Deskripsi Aktivitas</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50 text-slate-700">
+                        {sumData.journals.map((j: any, i: number) => (
+                          <tr key={i}>
+                            <td className="p-2 whitespace-nowrap">{j.tanggal}</td>
+                            <td className="p-2 font-bold">{j.jam_mengajar} Jam</td>
+                            <td className="p-2 text-slate-600 line-clamp-2 leading-relaxed">{j.deskripsi}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1">Daftar Kehadiran & Nilai Siswa</h4>
+                <div className="max-h-[220px] overflow-y-auto border border-slate-100 rounded-xl bg-white text-[10px]">
+                  <table className="w-full text-center border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold">
+                        <th className="p-2 text-left w-10">No</th>
+                        <th className="p-2 text-left">Nama</th>
+                        <th className="p-2 w-10">H</th>
+                        <th className="p-2 w-10">S</th>
+                        <th className="p-2 w-10">I</th>
+                        <th className="p-2 w-10">A</th>
+                        <th className="p-2 w-14">% Abs</th>
+                        <th className="p-2 w-16">Nilai Akhir</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 text-slate-700">
+                      {sumData.students.map((s: any) => (
+                        <tr key={s.no}>
+                          <td className="p-2 text-left">{s.no}</td>
+                          <td className="p-2 text-left font-semibold uppercase truncate max-w-[120px]">{s.nama}</td>
+                          <td className="p-2 text-emerald-600">{s.hadir}</td>
+                          <td className="p-2 text-amber-600">{s.sakit}</td>
+                          <td className="p-2 text-blue-600">{s.izin}</td>
+                          <td className="p-2 text-red-600">{s.alfa}</td>
+                          <td className="p-2 font-bold">{s.persentaseKehadiran}%</td>
+                          <td className="p-2 font-black text-slate-800">{s.nilaiAkhir}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ==============================================
           KARTU 3: ANALISIS KKM PER TUJUAN PEMBELAJARAN
           ============================================== */}
       <div className="bg-white p-4 md:p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-5">
@@ -1248,6 +1589,132 @@ const TeacherReports: React.FC = () => {
         )}
       </div>
     </div>
+
+    {/* PRINT ONLY STYLE & CONTAINER */}
+    <style dangerouslySetInnerHTML={{__html: `
+      @media print {
+        .no-print { display: none !important; }
+        .print-only { display: block !important; }
+        body { background: white !important; color: black !important; padding: 0 !important; margin: 0 !important; font-size: 10pt !important; }
+        @page { size: A4 portrait; margin: 1.5cm; }
+        .page-break { page-break-before: always; }
+      }
+    `}} />
+
+    {sumData && (
+      <div className="hidden print:block print-only bg-white text-black p-4 font-sans max-w-4xl mx-auto space-y-6">
+        {/* Header Dokumen Resmi */}
+        <div className="border-b-4 border-double border-slate-900 pb-4 text-center space-y-1">
+          <h1 className="text-xl font-extrabold uppercase tracking-tight">LAPORAN RINGKASAN BULANAN PEMBELAJARAN</h1>
+          <h2 className="text-sm font-black uppercase tracking-wide text-slate-700">PENDIDIKAN AGAMA ISLAM DAN BUDI PEKERTI (PAI)</h2>
+          <p className="text-[10px] text-slate-500 font-bold tracking-wider">KEMENTERIAN AGAMA REPUBLIK INDONESIA</p>
+          <div className="mt-3 text-xs font-semibold text-slate-600 flex justify-center gap-6 border-t border-slate-100 pt-2">
+            <span>Kelas: <strong className="text-slate-900">{sumData.kelas}</strong></span>
+            <span>Bulan: <strong className="text-slate-900">{sumData.bulan} {sumData.tahun}</strong></span>
+            <span>Semester: <strong className="text-slate-900">{sumData.semester}</strong></span>
+          </div>
+        </div>
+
+        {/* Ringkasan Indikator Kinerja Utama */}
+        <div className="grid grid-cols-4 gap-3 text-center">
+          <div className="border border-slate-300 p-2 rounded-xl">
+            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Total Siswa</div>
+            <div className="text-base font-black text-slate-800">{sumData.stats.totalSiswa}</div>
+          </div>
+          <div className="border border-slate-300 p-2 rounded-xl">
+            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Rata-Rata Nilai</div>
+            <div className="text-base font-black text-slate-800">{sumData.stats.rataRataNilai}</div>
+          </div>
+          <div className="border border-slate-300 p-2 rounded-xl">
+            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Rata-Rata Hadir</div>
+            <div className="text-base font-black text-slate-800">{sumData.stats.rataRataHadir}%</div>
+          </div>
+          <div className="border border-slate-300 p-2 rounded-xl">
+            <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Jam Mengajar</div>
+            <div className="text-base font-black text-slate-800">{sumData.stats.totalJamMengajar} Jam</div>
+          </div>
+        </div>
+
+        {/* Jurnal Harian Pengajaran Guru */}
+        <div className="space-y-2">
+          <h3 className="text-[10px] font-black uppercase border-b-2 border-slate-800 pb-1 text-slate-800 tracking-wider">I. JURNAL HARIAN MENGAJAR GURU (BULANAN)</h3>
+          {sumData.journals.length === 0 ? (
+            <p className="text-[10px] text-slate-500 italic">Tidak ada catatan jurnal pengajaran guru untuk periode bulan ini.</p>
+          ) : (
+            <div className="border border-slate-300 rounded-xl overflow-hidden">
+              <table className="w-full text-left border-collapse text-[9px]">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-300 font-bold text-slate-700">
+                    <th className="p-2 w-28 border-r border-slate-200">Tanggal</th>
+                    <th className="p-2 w-20 border-r border-slate-200 text-center">Jam Mengajar</th>
+                    <th className="p-2">Uraian / Deskripsi Kegiatan Pembelajaran & Capaian Kelas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {sumData.journals.map((j: any, i: number) => (
+                    <tr key={i}>
+                      <td className="p-2 border-r border-slate-200 font-medium">
+                        {new Date(j.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </td>
+                      <td className="p-2 border-r border-slate-200 text-center font-bold">{j.jam_mengajar} Jam</td>
+                      <td className="p-2 text-slate-700 leading-relaxed whitespace-pre-wrap">{j.deskripsi}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Rekap Kehadiran dan Nilai Akhir Siswa */}
+        <div className="space-y-2 page-break">
+          <h3 className="text-[10px] font-black uppercase border-b-2 border-slate-800 pb-1 text-slate-800 tracking-wider">II. REKAPITULASI PERSENTASE KEHADIRAN & NILAI AKHIR SISWA</h3>
+          <div className="border border-slate-300 rounded-xl overflow-hidden">
+            <table className="w-full text-center border-collapse text-[9px]">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-300 font-bold text-slate-700">
+                  <th className="p-2 text-left w-10 border-r border-slate-200">No</th>
+                  <th className="p-2 text-left border-r border-slate-200">Nama Lengkap Siswa</th>
+                  <th className="p-2 w-14 border-r border-slate-200">Hadir</th>
+                  <th className="p-2 w-14 border-r border-slate-200">Sakit</th>
+                  <th className="p-2 w-14 border-r border-slate-200">Izin</th>
+                  <th className="p-2 w-14 border-r border-slate-200">Alfa</th>
+                  <th className="p-2 w-20 border-r border-slate-200">% Hadir</th>
+                  <th className="p-2 w-24">Nilai Akhir (Sem)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {sumData.students.map((s: any) => (
+                  <tr key={s.no} className="text-slate-800">
+                    <td className="p-2 border-r border-slate-200 text-left">{s.no}</td>
+                    <td className="p-2 border-r border-slate-200 text-left font-bold uppercase truncate max-w-[200px]">{s.nama}</td>
+                    <td className="p-2 border-r border-slate-200">{s.hadir}</td>
+                    <td className="p-2 border-r border-slate-200">{s.sakit}</td>
+                    <td className="p-2 border-r border-slate-200">{s.izin}</td>
+                    <td className="p-2 border-r border-slate-200">{s.alfa}</td>
+                    <td className="p-2 border-r border-slate-200 font-bold">{s.persentaseKehadiran}%</td>
+                    <td className="p-2 font-extrabold text-slate-900">{s.nilaiAkhir}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Tanda Tangan */}
+        <div className="pt-8 flex justify-between text-[10px]">
+          <div></div>
+          <div className="text-center w-64 space-y-16">
+            <p>Mengetahui,<br />Guru Mata Pelajaran PAI & Budi Pekerti</p>
+            <div>
+              <p className="font-bold underline uppercase">___________________________</p>
+              <p className="text-slate-500 font-medium">NIP. -</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 };
 

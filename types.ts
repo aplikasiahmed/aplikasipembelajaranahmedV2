@@ -105,3 +105,12 @@ export interface ExamResult {
   started_at?: string; // NEW: Waktu mulai mengerjakan
   submitted_at: string;
 }
+
+export interface JurnalHarian {
+  id: string;
+  tanggal: string;
+  kelas: string;
+  jam_mengajar: string;
+  deskripsi: string;
+  created_at: string;
+}

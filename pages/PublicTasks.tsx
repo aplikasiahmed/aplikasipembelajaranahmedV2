@@ -162,7 +162,7 @@ const PublicTasks: React.FC = () => {
         img.onload = () => {
           const canvas = document.createElement('canvas');
           // PERTAHANKAN: Max Width 480px (Ukuran WA Low Quality)
-          const MAX_WIDTH = 450; 
+          const MAX_WIDTH = 360; 
           let width = img.width;
           let height = img.height;
 
@@ -182,8 +182,8 @@ const PublicTasks: React.FC = () => {
           
           ctx.drawImage(img, 0, 0, width, height);
           
-          // PERTAHANKAN: Quality 0.4 (40%) - Hasil Base64 sangat kecil
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.4);
+          // PERTAHANKAN: Quality 0.35 (35%) - Hasil Base64 sangat kecil
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.35);
           resolve(dataUrl);
         };
         img.onerror = (error) => reject(error);
@@ -259,8 +259,8 @@ const PublicTasks: React.FC = () => {
       currentY += img.height + 20;
     });
 
-    // PERTAHANKAN: Hasil Merge dikompres lagi ke 40%
-    return canvas.toDataURL('image/jpeg', 0.4);
+    // PERTAHANKAN: Hasil Merge dikompres lagi ke 35%
+    return canvas.toDataURL('image/jpeg', 0.35);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
