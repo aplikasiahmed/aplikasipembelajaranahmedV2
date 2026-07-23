@@ -1,6 +1,4 @@
 import { Student, AttendanceRecord, GradeRecord, Material, GradeLevel, TaskSubmission, AdminUser, Exam, Question, ExamResult, JurnalHarian } from '../types';
-import { firestore } from './firebase';
-import { collection, doc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 
 // Definisikan tipe untuk spreadsheet helper
 interface SheetConfig {
@@ -13,7 +11,7 @@ const TABS_CONFIG: SheetConfig[] = [
   { name: 'data_siswa', headers: ['id', 'nis', 'namalengkap', 'kelas', 'jeniskelamin'] },
   { name: 'Nilai', headers: ['id', 'student_id', 'subject_type', 'score', 'description', 'kelas', 'semester', 'created_at'] },
   { name: 'kehadiran', headers: ['id', 'student_id', 'nama_siswa', 'nis', 'kelas', 'date', 'status', 'semester'] },
-  { name: 'data_TugasSiswa', headers: ['id', 'nisn', 'student_name', 'kelas', 'task_name', 'submission_type', 'content', 'created_at'] },
+  { name: 'data_TugasSiswa', headers: ['id', 'nisn', 'student_name', 'kelas', 'task_name', 'submission_type', 'content1', 'content2', 'content3', 'content4', 'content5', 'created_at'] },
   { name: 'materi_belajar', headers: ['id', 'title', 'description', 'grade', 'category', 'content_url', 'thumbnail', 'semester', 'kelas', 'tp_id', 'text_content'] },
   { name: 'ujian', headers: ['id', 'title', 'grade', 'category', 'semester', 'duration', 'deadline', 'is_random', 'status', 'created_at', 'tp_id', 'assessment_id'] },
   { name: 'bank_soal', headers: ['id', 'exam_id', 'type', 'text', 'image_url', 'options', 'correct_answer'] },
@@ -102,21 +100,8 @@ class DatabaseService {
     
     localStorage.setItem(key, JSON.stringify(processedData));
     
-    // Auto-sync in background to Google Sheets if not pulling from sheets
-    if (!this.isSyncingFromSheets) {
-      this.getAppsScriptUrl().then(appsScriptUrl => {
-        const token = localStorage.getItem('google_oauth_token') || undefined;
-        if (appsScriptUrl || token) {
-          const isTableValid = TABS_CONFIG.some(cfg => cfg.name === name);
-          if (isTableValid) {
-            this.syncTableToGoogleSheets(name, token).catch(err => {
-              // Gracefully handle or log as warn to avoid noisy background fetch errors in offline or unconfigured environments
-              console.warn(`Auto-sync background info for sheet ${name} (non-blocking):`, err.message || err);
-            });
-          }
-        }
-      });
-    }
+    // PERMINTAAN USER: Nonaktifkan fitur sinkronisasi web otomatis di background.
+    // Semua sinkronisasi ke Google Sheets kini dilakukan secara manual oleh guru melalui tombol sinkronisasi.
   }
 
   // Canonical Header normalizer

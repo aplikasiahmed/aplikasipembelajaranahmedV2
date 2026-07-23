@@ -161,8 +161,8 @@ const PublicTasks: React.FC = () => {
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          // PERTAHANKAN: Max Width 480px (Ukuran WA Low Quality)
-          const MAX_WIDTH = 360; 
+          // PERTAHANKAN: Max Width optimal untuk spreadsheet cell (sangat kecil dan ringan)
+          const MAX_WIDTH = 240; 
           let width = img.width;
           let height = img.height;
 
@@ -182,8 +182,8 @@ const PublicTasks: React.FC = () => {
           
           ctx.drawImage(img, 0, 0, width, height);
           
-          // PERTAHANKAN: Quality 0.35 (35%) - Hasil Base64 sangat kecil
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.35);
+          // Kompresi kualitas ke 0.15 agar hasil Base64 sangat kecil (<5KB) namun tetap valid
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.15);
           resolve(dataUrl);
         };
         img.onerror = (error) => reject(error);
@@ -194,11 +194,25 @@ const PublicTasks: React.FC = () => {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
+      const selectedFiles = Array.from(e.target.files);
+      
+      if (photos.length + selectedFiles.length > 5) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Maksimal 5 Foto',
+          text: 'Maaf, Anda hanya diperbolehkan mengunggah maksimal 5 foto tugas saja.',
+          confirmButtonColor: '#059669',
+          customClass: { popup: 'rounded-[2rem]' }
+        });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
       setProcessingImage(true);
       try {
         const newPhotos: string[] = [];
-        for (let i = 0; i < e.target.files.length; i++) {
-          const file = e.target.files[i];
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
           const compressed = await compressImage(file);
           newPhotos.push(compressed);
         }
@@ -230,37 +244,49 @@ const PublicTasks: React.FC = () => {
       });
     }));
 
-    const width = Math.max(...loadedImages.map(img => img.width));
-    const totalHeight = loadedImages.reduce((acc, img) => acc + img.height, 0) + (loadedImages.length - 1) * 20;
+    const rawWidth = Math.max(...loadedImages.map(img => img.width));
+    const rawTotalHeight = loadedImages.reduce((acc, img) => acc + img.height, 0) + (loadedImages.length - 1) * 20;
+
+    // Tentukan skala target maksimum agar muat di sel Spreadsheet
+    const MAX_MERGED_WIDTH = 240;
+    let finalWidth = rawWidth;
+    let finalHeight = rawTotalHeight;
+    if (rawWidth > MAX_MERGED_WIDTH) {
+      finalHeight *= MAX_MERGED_WIDTH / rawWidth;
+      finalWidth = MAX_MERGED_WIDTH;
+    }
 
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = totalHeight;
+    canvas.width = finalWidth;
+    canvas.height = finalHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
 
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, totalHeight);
+    ctx.fillRect(0, 0, finalWidth, finalHeight);
 
+    const scale = finalWidth / rawWidth;
     let currentY = 0;
     loadedImages.forEach((img, index) => {
-      const x = (width - img.width) / 2;
-      ctx.drawImage(img, x, currentY);
+      const targetW = img.width * scale;
+      const targetH = img.height * scale;
+      const x = (finalWidth - targetW) / 2;
+      ctx.drawImage(img, x, currentY, targetW, targetH);
       
       if (index < loadedImages.length - 1) {
           ctx.beginPath();
-          ctx.moveTo(0, currentY + img.height + 10);
-          ctx.lineTo(width, currentY + img.height + 10);
+          ctx.moveTo(0, currentY + targetH + (5 * scale));
+          ctx.lineTo(finalWidth, currentY + targetH + (5 * scale));
           ctx.strokeStyle = '#e2e8f0'; 
-          ctx.lineWidth = 4;
+          ctx.lineWidth = Math.max(1, 4 * scale);
           ctx.stroke();
       }
 
-      currentY += img.height + 20;
+      currentY += targetH + (10 * scale);
     });
 
-    // PERTAHANKAN: Hasil Merge dikompres lagi ke 35%
-    return canvas.toDataURL('image/jpeg', 0.35);
+    // Hasil merge dikompresi ke 15% agar aman dan sangat ringan
+    return canvas.toDataURL('image/jpeg', 0.15);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -307,24 +333,6 @@ const PublicTasks: React.FC = () => {
     setLoading(true);
     
     try {
-      let finalContent = formData.content;
-
-      // Proses Merge Foto (Hanya jika tipe foto dan lebih dari 1)
-      if (formData.submission_type === 'photo') {
-          if (photos.length > 1) {
-              try {
-                  finalContent = await mergePhotos(photos);
-              } catch (err) {
-                  console.error(err);
-                  Swal.fire('Gagal', 'Gagal Proses foto.', 'error');
-                  setLoading(false);
-                  return;
-              }
-          } else {
-              finalContent = photos[0];
-          }
-      }
-
       // Kirim ke Database
       await db.addTaskSubmission({
         nisn: formData.nisn,
@@ -332,7 +340,11 @@ const PublicTasks: React.FC = () => {
         kelas: formData.kelas,
         task_name: formData.task_name,
         submission_type: formData.submission_type,
-        content: finalContent
+        content1: formData.submission_type === 'photo' ? (photos[0] || '') : formData.content,
+        content2: formData.submission_type === 'photo' ? (photos[1] || '') : '',
+        content3: formData.submission_type === 'photo' ? (photos[2] || '') : '',
+        content4: formData.submission_type === 'photo' ? (photos[3] || '') : '',
+        content5: formData.submission_type === 'photo' ? (photos[4] || '') : '',
       });
 
       const now = new Date();
@@ -495,7 +507,7 @@ const PublicTasks: React.FC = () => {
                     onChange={handleFileChange} 
                 />
 
-                {photos.length > 0 ? (
+                 {photos.length > 0 ? (
                     <div className="space-y-3">
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             {photos.map((photo, idx) => (
@@ -514,17 +526,19 @@ const PublicTasks: React.FC = () => {
                                 </div>
                             ))}
                             
-                            <button 
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-emerald-300 bg-emerald-50/50 rounded-xl aspect-square hover:bg-emerald-50 transition-all text-emerald-600 active:scale-95"
-                            >
-                                <Plus size={24} />
-                                <span className="text-[9px] font-bold uppercase">Tambah</span>
-                            </button>
+                            {photos.length < 5 && (
+                              <button 
+                                  type="button"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-emerald-300 bg-emerald-50/50 rounded-xl aspect-square hover:bg-emerald-50 transition-all text-emerald-600 active:scale-95"
+                              >
+                                  <Plus size={24} />
+                                  <span className="text-[9px] font-bold uppercase">Tambah</span>
+                              </button>
+                            )}
                         </div>
-                        <p className="text-[10px] text-center text-slate-400 italic">
-                             *pastikan foto sudah benar sebelum di kirim !.
+                        <p className="text-[10px] text-center text-red-500 font-bold bg-red-50/70 py-2 px-3 rounded-xl border border-red-100 italic">
+                             *Maksimal 5 foto tugas saja yang diperbolehkan! Pastikan foto jelas dan tidak blur sebelum dikirim.
                         </p>
                     </div>
                 ) : (
@@ -549,12 +563,12 @@ const PublicTasks: React.FC = () => {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-slate-100">
+                           <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm border border-slate-100">
                               <ImageIcon size={20} className="text-slate-400" />
                           </div>
                           <div>
                              <p className="text-[11px] font-black text-slate-600 tracking-tight uppercase">Ambil Foto Tugas</p>
-                             <p className="text-[10px] font-normal italic text-slate-400">Pastikan Pencahayaan Foto Jelas & Tidak Blur </p>
+                             <p className="text-[10px] font-normal italic text-slate-400">Pastikan Pencahayaan Foto Jelas & Tidak Blur (Maksimal 5 Foto)</p>
                           </div>
                         </div>
                       )}
@@ -623,6 +637,26 @@ const PublicTasks: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* FULL-SCREEN GLASSMORPHIC LOADING OVERLAY */}
+      {loading && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white p-8 rounded-[2rem] shadow-2xl border border-slate-100 max-w-sm w-full text-center space-y-4 animate-scaleUp">
+            <div className="relative w-20 h-20 mx-auto">
+              {/* Spinning Ring */}
+              <div className="absolute inset-0 border-4 border-emerald-100 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+              <Loader2 className="absolute inset-0 m-auto text-emerald-600 animate-pulse" size={32} />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">MENGIRIM TUGAS...</h3>
+              <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                Sedang memproses dan mengunggah foto tugas Anda. Harap tunggu sebentar dan jangan tutup halaman ini.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

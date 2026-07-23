@@ -47,7 +47,11 @@ export interface TaskSubmission {
   kelas: string;
   task_name: string;
   submission_type: 'link' | 'photo';
-  content: string; 
+  content1: string; 
+  content2?: string;
+  content3?: string;
+  content4?: string;
+  content5?: string;
   created_at: string;
 }
 

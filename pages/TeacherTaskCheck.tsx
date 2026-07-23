@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, ExternalLink, Image as ImageIcon, Link as LinkIcon, Trash2, Loader2, Calendar, FileText, ArrowLeft, CheckCircle2, Clock, ShieldAlert, RefreshCw } from 'lucide-react';
+import { Search, Filter, ExternalLink, Image as ImageIcon, Link as LinkIcon, Trash2, Loader2, Calendar, FileText, ArrowLeft, CheckCircle2, Clock, ShieldAlert } from 'lucide-react';
 import { db } from '../services/supabaseMock';
 import { TaskSubmission, GradeLevel } from '../types';
 import Swal from 'sweetalert2';
@@ -15,33 +15,6 @@ const TeacherTaskCheck: React.FC = () => {
   
   const [tasks, setTasks] = useState<TaskSubmission[]>([]);
   const [examResults, setExamResults] = useState<any[]>([]);
-  const [syncing, setSyncing] = useState(false);
-
-  const handleSyncData = async () => {
-    setSyncing(true);
-    try {
-      await db.syncFromGoogleSheets();
-      await loadClasses();
-      if (activeTab === 'tasks') {
-        await loadTasks();
-      } else {
-        await loadExamResults();
-      }
-      Swal.fire({
-        toast: true,
-        position: 'top-end',
-        icon: 'success',
-        title: 'Data berhasil disinkronkan!',
-        showConfirmButton: false,
-        timer: 1500
-      });
-    } catch (error) {
-      console.error(error);
-      Swal.fire('Gagal', 'Gagal menyinkronkan data dari Google Sheets.', 'error');
-    } finally {
-      setSyncing(false);
-    }
-  };
   
   // --- STATE FILTER ---
   const [filterGrade, setFilterGrade] = useState<GradeLevel | 'all'>('all');
@@ -111,16 +84,26 @@ const TeacherTaskCheck: React.FC = () => {
   // --- ACTIONS: TASKS ---
   const viewContent = async (task: TaskSubmission) => {
     if (task.submission_type === 'link') {
-      window.open(task.content, '_blank');
+      window.open(task.content1, '_blank');
     } else {
       const dateStr = new Date(task.created_at).toLocaleDateString('id-ID', {
           day: 'numeric', month: 'long', year: 'numeric'
       });
 
-      let displayUrl = task.content;
-      if (displayUrl && !displayUrl.startsWith('data:') && !displayUrl.startsWith('http')) {
-        displayUrl = `data:image/jpeg;base64,${displayUrl}`;
-      }
+      const rawUrls = [task.content1, task.content2, task.content3, task.content4, task.content5].filter(Boolean) as string[];
+      const urls = rawUrls.map(url => {
+        if (url && !url.startsWith('data:') && !url.startsWith('http')) {
+          return `data:image/jpeg;base64,${url}`;
+        }
+        return url;
+      });
+
+      const imagesHtml = urls.map((url, i) => `
+        <div class="mb-4 border border-slate-100 rounded-2xl overflow-hidden bg-slate-50 p-2 shadow-sm">
+          <div class="text-[9px] font-black text-slate-500 mb-1.5 uppercase tracking-wider text-left pl-1">FOTO TUGAS KE-${i + 1} / ${urls.length}</div>
+          <img src="${url}" class="w-full rounded-xl object-contain max-h-[380px] border border-slate-200 bg-white" alt="Tugas ${i + 1}" />
+        </div>
+      `).join('');
 
       // Cek apakah nilai sudah diinput
       let alreadyGraded = false;
@@ -141,9 +124,14 @@ const TeacherTaskCheck: React.FC = () => {
 
       const result = await Swal.fire({
         title: `Tugas: ${task.task_name}`,
-        text: `Dari: ${task.student_name} (${task.kelas}) • Tanggal: ${dateStr}`,
-        imageUrl: displayUrl,
-        imageAlt: 'Tugas Siswa',
+        html: `
+          <div class="text-xs text-slate-500 font-medium mb-4 text-center">
+            Siswa: <span class="font-bold text-slate-800">${task.student_name}</span> (${task.kelas}) <br/> Tanggal: ${dateStr}
+          </div>
+          <div class="space-y-4 max-h-[50vh] overflow-y-auto scrollbar-thin px-1 text-slate-700">
+            ${imagesHtml}
+          </div>
+        `,
         showCancelButton: true,
         confirmButtonText: alreadyGraded ? 'NILAI SUDAH DIINPUT' : 'INPUT NILAI',
         cancelButtonText: 'TUTUP',
@@ -333,27 +321,9 @@ const TeacherTaskCheck: React.FC = () => {
             <h1 className="text-lg md:text-2xl font-black text-slate-800 tracking-tight leading-tight">Monitoring Siswa</h1>
             <p className="text-slate-400 text-[10px] md:text-sm font-medium">Cek pengumpulan tugas harian dan hasil tugas online.</p>
           </div>
-          
-          <button
-            onClick={handleSyncData}
-            disabled={syncing}
-            className={`md:hidden flex items-center justify-center p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 hover:bg-purple-100 transition-all ${syncing ? 'animate-spin' : ''}`}
-            title="Sinkronisasi Google Sheets"
-          >
-            <RefreshCw size={16} />
-          </button>
         </div>
         
         <div className="flex flex-col sm:flex-row items-stretch md:items-center gap-2">
-          <button
-            onClick={handleSyncData}
-            disabled={syncing}
-            className={`hidden md:flex items-center gap-2 px-3.5 py-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 hover:bg-purple-100 font-bold text-xs transition-all ${syncing ? 'opacity-80 cursor-not-allowed' : ''}`}
-          >
-            <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
-            <span>{syncing ? 'Sinkronisasi...' : 'Tarik Data Terbaru'}</span>
-          </button>
-          
           {/* TABS SWITCHER */}
           <div className="bg-slate-100 p-1 rounded-xl flex">
               <button 
