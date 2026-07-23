@@ -1421,6 +1421,14 @@ class DatabaseService {
     const list = this.getLocalTable<TaskSubmission>('data_TugasSiswa');
     list.push(cleanSub);
     this.setLocalTable('data_TugasSiswa', list);
+
+    // Sync to Google Sheets!
+    const appsScriptUrl = await this.getAppsScriptUrl();
+    const spreadsheetId = await this.getSpreadsheetId();
+    if (appsScriptUrl || spreadsheetId) {
+      const token = localStorage.getItem('google_oauth_token') || undefined;
+      await this.syncTableToGoogleSheets('data_TugasSiswa', token);
+    }
   }
 
   async getTaskSubmissions(grade?: string): Promise<TaskSubmission[]> {
@@ -1436,6 +1444,14 @@ class DatabaseService {
     const list = this.getLocalTable<TaskSubmission>('data_TugasSiswa');
     const filtered = list.filter(s => s.id !== id);
     this.setLocalTable('data_TugasSiswa', filtered);
+
+    // Sync to Google Sheets!
+    const appsScriptUrl = await this.getAppsScriptUrl();
+    const spreadsheetId = await this.getSpreadsheetId();
+    if (appsScriptUrl || spreadsheetId) {
+      const token = localStorage.getItem('google_oauth_token') || undefined;
+      await this.syncTableToGoogleSheets('data_TugasSiswa', token);
+    }
   }
 
   async getMaterials(grade?: GradeLevel): Promise<Material[]> {
