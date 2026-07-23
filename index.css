@@ -15,3 +15,118 @@
     height: 0 !important;
   }
 }
+
+/* ==========================================================================
+   FINE-TUNED RESPONSIVE LAYOUT FOR 10" TABLETS (768px to 1025px)
+   ========================================================================== */
+@media (min-width: 768px) and (max-width: 1025px) {
+  /* Scoped layout scaling */
+  .teacher-panel {
+    font-size: 0.85rem !important;
+  }
+
+  /* Compact headings and banners */
+  .teacher-panel h1 {
+    font-size: 1.35rem !important;
+    line-height: 1.25 !important;
+  }
+  .teacher-panel h2 {
+    font-size: 1.05rem !important;
+    line-height: 1.2 !important;
+  }
+  .teacher-panel h3 {
+    font-size: 0.9rem !important;
+    line-height: 1.2 !important;
+  }
+  .teacher-panel p,
+  .teacher-panel .text-sm {
+    font-size: 0.8rem !important;
+  }
+  .teacher-panel .text-xs {
+    font-size: 0.725rem !important;
+  }
+  .teacher-panel [class*="text-[10px]"],
+  .teacher-panel [class*="text-[9px]"] {
+    font-size: 0.675rem !important;
+  }
+
+  /* Compact container paddings */
+  .teacher-panel main {
+    padding: 1rem !important;
+  }
+  
+  .teacher-panel .max-w-5xl {
+    max-width: 100% !important;
+  }
+
+  /* Card and Panel optimization */
+  .teacher-panel [class*="rounded-3xl"],
+  .teacher-panel [class*="rounded-[1.8rem]"],
+  .teacher-panel [class*="rounded-[2.5rem]"],
+  .teacher-panel [class*="rounded-2xl"] {
+    border-radius: 1rem !important;
+  }
+
+  .teacher-panel [class*="p-8"],
+  .teacher-panel [class*="p-6"],
+  .teacher-panel [class*="p-5"] {
+    padding: 0.875rem !important;
+  }
+
+  .teacher-panel .p-4 {
+    padding: 0.75rem !important;
+  }
+
+  /* Grid spacing and layout adjustments */
+  .teacher-panel [class*="gap-6"],
+  .teacher-panel [class*="gap-4"] {
+    gap: 0.75rem !important;
+  }
+  
+  .teacher-panel [class*="space-y-6"] > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.75rem !important;
+  }
+  .teacher-panel [class*="space-y-4"] > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.625rem !important;
+  }
+  .teacher-panel [class*="space-y-3"] > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.5rem !important;
+  }
+
+  /* Form elements, selects, inputs, and button controls */
+  .teacher-panel select,
+  .teacher-panel input,
+  .teacher-panel textarea {
+    padding-top: 0.45rem !important;
+    padding-bottom: 0.45rem !important;
+    padding-left: 0.625rem !important;
+    padding-right: 0.625rem !important;
+    font-size: 0.775rem !important;
+    border-radius: 0.625rem !important;
+  }
+
+  .teacher-panel button,
+  .teacher-panel .btn {
+    padding-top: 0.45rem !important;
+    padding-bottom: 0.45rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    font-size: 0.775rem !important;
+    border-radius: 0.625rem !important;
+  }
+
+  /* Table density optimizations */
+  .teacher-panel table th,
+  .teacher-panel table td {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    padding-top: 0.4rem !important;
+    padding-bottom: 0.4rem !important;
+    font-size: 0.775rem !important;
+  }
+
+  /* Make grid systems on tables/side-by-sides more flexible */
+  .teacher-panel [class*="grid-cols-12"] {
+    gap: 0.75rem !important;
+  }
+}

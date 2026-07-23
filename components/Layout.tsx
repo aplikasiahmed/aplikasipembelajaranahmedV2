@@ -118,7 +118,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   if (isTeacherPage) {
     return (
-      <div className="min-h-screen flex bg-slate-50 overflow-x-hidden relative">
+      <div className="min-h-screen flex bg-slate-50 overflow-x-hidden relative teacher-panel">
         {/* Sidebar Container */}
         <aside 
           className={`bg-white border-r border-slate-200 flex flex-col fixed lg:sticky top-0 h-screen z-50 transition-all duration-300 ${
