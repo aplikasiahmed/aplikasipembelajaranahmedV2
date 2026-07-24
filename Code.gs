@@ -1,6 +1,6 @@
 /**
  * Google Apps Script untuk Sinkronisasi Pembelajaran PAI
- * Template v2 - Mendukung Multi-Foto (content1 s.d content5)
+ * Template v2 - Mendukung Multi-Foto (content1 s.d content3)
  * 
  * Petunjuk Penggunaan:
  * 1. Buka Google Spreadsheet Anda.

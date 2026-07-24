@@ -196,11 +196,11 @@ const PublicTasks: React.FC = () => {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
       
-      if (photos.length + selectedFiles.length > 5) {
+      if (photos.length + selectedFiles.length > 3) {
         Swal.fire({
           icon: 'warning',
-          title: 'Maksimal 5 Foto',
-          text: 'Maaf, Anda hanya diperbolehkan mengunggah maksimal 5 foto tugas saja.',
+          title: 'Maksimal 3 Foto',
+          text: 'Maaf, Anda hanya diperbolehkan mengunggah maksimal 3 foto tugas saja.',
           confirmButtonColor: '#059669',
           customClass: { popup: 'rounded-[2rem]' }
         });
@@ -343,8 +343,6 @@ const PublicTasks: React.FC = () => {
         content1: formData.submission_type === 'photo' ? (photos[0] || '') : formData.content,
         content2: formData.submission_type === 'photo' ? (photos[1] || '') : '',
         content3: formData.submission_type === 'photo' ? (photos[2] || '') : '',
-        content4: formData.submission_type === 'photo' ? (photos[3] || '') : '',
-        content5: formData.submission_type === 'photo' ? (photos[4] || '') : '',
       });
 
       const now = new Date();
@@ -526,7 +524,7 @@ const PublicTasks: React.FC = () => {
                                 </div>
                             ))}
                             
-                            {photos.length < 5 && (
+                            {photos.length < 3 && (
                               <button 
                                   type="button"
                                   onClick={() => fileInputRef.current?.click()}
@@ -538,7 +536,7 @@ const PublicTasks: React.FC = () => {
                             )}
                         </div>
                         <p className="text-[10px] text-center text-red-500 font-bold bg-red-50/70 py-2 px-3 rounded-xl border border-red-100 italic">
-                             *Maksimal 5 foto tugas saja yang diperbolehkan! Pastikan foto jelas dan tidak blur sebelum dikirim.
+                             *Maksimal 3 foto tugas saja yang diperbolehkan! Pastikan foto jelas dan tidak blur sebelum dikirim.
                         </p>
                     </div>
                 ) : (
