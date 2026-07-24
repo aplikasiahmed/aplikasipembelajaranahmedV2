@@ -19,6 +19,24 @@ const TeacherInputAbsensi: React.FC = () => {
   
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [alreadyExists, setAlreadyExists] = useState(false);
+
+  useEffect(() => {
+    const checkExisting = async () => {
+      if (!selectedKelas || !date) {
+        setAlreadyExists(false);
+        return;
+      }
+      try {
+        const records = await db.getAttendanceByKelas(selectedKelas);
+        const exists = records.some((rec: any) => rec.date === date);
+        setAlreadyExists(exists);
+      } catch (err) {
+        console.error("Gagal memeriksa absensi ganda:", err);
+      }
+    };
+    checkExisting();
+  }, [selectedKelas, date]);
 
   useEffect(() => {
     db.getAvailableKelas(grade).then((data: string[]) => {
@@ -61,6 +79,18 @@ const TeacherInputAbsensi: React.FC = () => {
     if (students.length === 0) { 
       Swal.fire({ icon: 'error', title: 'Siswa Tidak Ada', text: 'Pilih kelas yang memiliki data siswa.', heightAuto: false }); 
       return; 
+    }
+
+    // 1.5 Cek Absensi Ganda
+    if (alreadyExists) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Absensi Ganda Terdeteksi',
+        text: `Absensi untuk kelas ${selectedKelas} pada tanggal ${date} sudah terisi sebelumnya! Silakan pilih tanggal lain.`,
+        confirmButtonColor: '#dc2626',
+        heightAuto: false 
+      });
+      return;
     }
     
     // 2. Konfirmasi Sebelum Kirim
@@ -167,6 +197,16 @@ const TeacherInputAbsensi: React.FC = () => {
           </div>
         </div>
 
+        {alreadyExists && (
+          <div className="bg-red-50 border border-red-100 text-red-700 p-3.5 rounded-xl flex items-start gap-2.5 text-[10px] md:text-xs animate-fadeIn shadow-sm">
+            <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-extrabold text-red-800 uppercase tracking-tight">Absensi Sudah Terisi!</p>
+              <p className="text-red-600 font-medium leading-relaxed mt-0.5">Sistem mendeteksi bahwa absensi untuk kelas <span className="font-bold">{selectedKelas}</span> pada tanggal <span className="font-bold">{date}</span> sudah pernah diisi. Anda tidak dapat melakukan pengisian ganda untuk tanggal yang sama.</p>
+            </div>
+          </div>
+        )}
+
         <div className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-sm">
           <div className="bg-slate-50 p-2 md:p-3 border-b border-slate-100 flex justify-between items-center"><h3 className="text-[9px] md:text-xs font-bold text-slate-700 uppercase tracking-tight">Daftar Siswa {selectedKelas} (Maks 10 Baris Tampil, Sisanya Gulir)</h3>{loading && <Loader2 size={12} className="animate-spin text-amber-600" />}</div>
           <div className="divide-y divide-slate-50 max-h-[380px] overflow-y-auto">
@@ -179,7 +219,7 @@ const TeacherInputAbsensi: React.FC = () => {
           </div>
         </div>
 
-        <button onClick={handleSave} disabled={students.length === 0 || saving} className={`w-full py-3 md:py-4 rounded-xl font-black text-[10px] md:text-sm flex items-center justify-center gap-2 transition-all shadow-lg uppercase tracking-widest ${students.length > 0 && !saving ? 'bg-amber-600 hover:bg-amber-700 text-white active:scale-95' : 'bg-slate-200 text-slate-400'}`}>{saving ? <><Loader2 size={16} className="animate-spin" /> Menyimpan...</> : <><Save size={16} /> Simpan Absensi</>}</button>
+        <button onClick={handleSave} disabled={students.length === 0 || saving || alreadyExists} className={`w-full py-3 md:py-4 rounded-xl font-black text-[10px] md:text-sm flex items-center justify-center gap-2 transition-all shadow-lg uppercase tracking-widest ${students.length > 0 && !saving && !alreadyExists ? 'bg-amber-600 hover:bg-amber-700 text-white active:scale-95' : 'bg-slate-200 text-slate-400'}`}>{saving ? <><Loader2 size={16} className="animate-spin" /> Menyimpan...</> : <><Save size={16} /> Simpan Absensi</>}</button>
       </div>
     </div>
   );

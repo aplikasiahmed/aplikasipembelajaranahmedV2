@@ -96,21 +96,27 @@ const TeacherDashboard: React.FC = () => {
             color="emerald" 
             label="Total Siswa" 
             value={stats.totalStudents} 
+            onClick={() => navigate('/guru/datasiswa')}
         />
         <StatCard 
             icon={FileText} 
             color="purple" 
             label="Tugas Masuk" 
             value={stats.tasksToday} 
+            onClick={() => navigate('/guru/tugas-masuk')}
         />
         <StatCard 
             icon={CheckCircle2} 
             color="pink" 
             label="Tugas Online" 
             value={stats.onlineExamsCount} 
+            onClick={() => navigate('/guru/tugas-masuk')}
         />
         {/* Status Absensi dengan indikator visual */}
-        <div className="bg-white p-3.5 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-full relative overflow-hidden group hover:border-amber-200 transition-all">
+        <div 
+            onClick={() => navigate('/guru/absensi')}
+            className="bg-white p-3.5 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-full relative overflow-hidden group hover:border-amber-200 cursor-pointer hover:shadow-md hover:scale-[1.01] active:scale-[0.98] transition-all"
+        >
             <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:scale-110 transition-transform"><ClipboardCheck size={60}/></div>
             <div className="w-9 h-9 md:w-10 md:h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mb-2 shadow-sm">
                 <ClipboardCheck size={18} className="md:w-5 md:h-5" />
@@ -161,7 +167,7 @@ const TeacherDashboard: React.FC = () => {
 };
 
 // Helper Komponen untuk Card Statistik
-const StatCard = ({ icon: Icon, color, label, value }: any) => {
+const StatCard = ({ icon: Icon, color, label, value, onClick }: any) => {
     const styles: any = {
         emerald: { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'hover:border-emerald-200' },
         purple: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'hover:border-purple-200' },
@@ -171,7 +177,10 @@ const StatCard = ({ icon: Icon, color, label, value }: any) => {
     const s = styles[color] || styles.emerald;
 
     return (
-        <div className={`bg-white p-3.5 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-full relative overflow-hidden group transition-all ${s.border}`}>
+        <div 
+            onClick={onClick}
+            className={`bg-white p-3.5 md:p-4 rounded-xl md:rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between h-full relative overflow-hidden group transition-all ${s.border} ${onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.01] active:scale-[0.98]' : ''}`}
+        >
             <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:scale-110 transition-transform"><Icon size={60}/></div>
             <div className={`w-9 h-9 md:w-10 md:h-10 ${s.bg} ${s.text} rounded-xl flex items-center justify-center mb-2 shadow-sm`}>
                 <Icon size={18} className="md:w-5 md:h-5" />

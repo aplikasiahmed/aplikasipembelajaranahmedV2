@@ -283,7 +283,20 @@ function doPost(e) {
       var sheet = ss.getSheetByName(sheetName);
       if (!sheet) sheet = ss.insertSheet(sheetName);
       sheet.clear();
-      if (values.length > 0) sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+      if (values.length > 0) {
+        // Proteksi: Batasi panjang karakter per sel agar tidak melebihi limit Google Sheets (50.000 karakter)
+        for (var r = 0; r < values.length; r++) {
+          for (var c = 0; c < values[r].length; c++) {
+            if (values[r][c] !== null && values[r][c] !== undefined) {
+              var strVal = values[r][c].toString();
+              if (strVal.length > 49000) {
+                values[r][c] = strVal.substring(0, 48500) + "... [DIPOTONG KARENA BATAS SHEET]";
+              }
+            }
+          }
+        }
+        sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+      }
       result.success = true;
     }
   } catch (err) {
@@ -324,7 +337,20 @@ function doPost(e) {
       var sheet = ss.getSheetByName(sheetName);
       if (!sheet) sheet = ss.insertSheet(sheetName);
       sheet.clear();
-      if (values.length > 0) sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+      if (values.length > 0) {
+        // Proteksi: Batasi panjang karakter per sel agar tidak melebihi limit Google Sheets (50.000 karakter)
+        for (var r = 0; r < values.length; r++) {
+          for (var c = 0; c < values[r].length; c++) {
+            if (values[r][c] !== null && values[r][c] !== undefined) {
+              var strVal = values[r][c].toString();
+              if (strVal.length > 49000) {
+                values[r][c] = strVal.substring(0, 48500) + "... [DIPOTONG KARENA BATAS SHEET]";
+              }
+            }
+          }
+        }
+        sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+      }
       result.success = true;
     }
   } catch (err) {
