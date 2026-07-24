@@ -161,8 +161,8 @@ const PublicTasks: React.FC = () => {
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          // PERTAHANKAN: Max Width optimal untuk spreadsheet cell (sangat kecil dan ringan)
-          const MAX_WIDTH = 240; 
+          // Tingkatkan resolusi target ke 900px agar tulisan tangan siswa sangat tajam dan terbaca jelas oleh guru
+          const MAX_WIDTH = 900; 
           let width = img.width;
           let height = img.height;
 
@@ -182,8 +182,34 @@ const PublicTasks: React.FC = () => {
           
           ctx.drawImage(img, 0, 0, width, height);
           
-          // Kompresi kualitas ke 0.15 agar hasil Base64 sangat kecil (<5KB) namun tetap valid
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.15);
+          // Mulai dengan kualitas tinggi (0.75) agar sangat tajam.
+          // Jika hasilnya terlalu besar untuk batas Google Sheets (48,500 karakter),
+          // kita perkecil kualitasnya secara bertahap (0.6, lalu 0.5, dst.) sampai ukurannya aman.
+          let quality = 0.75;
+          let dataUrl = canvas.toDataURL('image/jpeg', quality);
+          
+          while (dataUrl.length > 48500 && quality > 0.15) {
+            quality -= 0.10;
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
+          
+          // Jika masih melebihi batas, perkecil dimensi gambar menjadi 70% dan coba lagi
+          if (dataUrl.length > 48500) {
+            const smallerCanvas = document.createElement('canvas');
+            smallerCanvas.width = width * 0.7;
+            smallerCanvas.height = height * 0.7;
+            const sCtx = smallerCanvas.getContext('2d');
+            if (sCtx) {
+              sCtx.drawImage(canvas, 0, 0, smallerCanvas.width, smallerCanvas.height);
+              quality = 0.6;
+              dataUrl = smallerCanvas.toDataURL('image/jpeg', quality);
+              while (dataUrl.length > 48500 && quality > 0.15) {
+                quality -= 0.10;
+                dataUrl = smallerCanvas.toDataURL('image/jpeg', quality);
+              }
+            }
+          }
+          
           resolve(dataUrl);
         };
         img.onerror = (error) => reject(error);
@@ -566,7 +592,7 @@ const PublicTasks: React.FC = () => {
                           </div>
                           <div>
                              <p className="text-[11px] font-black text-slate-600 tracking-tight uppercase">Ambil Foto Tugas</p>
-                             <p className="text-[10px] font-normal italic text-slate-400">Pastikan Pencahayaan Foto Jelas & Tidak Blur (Maksimal 5 Foto)</p>
+                             <p className="text-[10px] font-normal italic text-slate-400">Pastikan Pencahayaan Foto Jelas & Tidak Blur (Maksimal 3 Foto)</p>
                           </div>
                         </div>
                       )}

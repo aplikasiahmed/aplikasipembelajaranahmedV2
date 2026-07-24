@@ -205,7 +205,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               onClick={handleLogout} 
               className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-1.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-md shadow-red-100 hover:bg-red-700 active:scale-95 transition-all"
             >
-              <LogOut size={12} strokeWidth={3} /> <span className="hidden sm:inline">KELUAR</span>
+              <LogOut size={12} strokeWidth={3} /> <span>KELUAR</span>
             </button>
           </header>
 
